@@ -1,0 +1,162 @@
+// server/prisma/schema.prisma
+//
+// Full MVP schema. Patient = User with role PATIENT (no separate table).
+// Dentist is a satellite table off User (one extra row for specialty +
+// working hours). Everything else follows the approved ERD.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  DENTIST
+  PATIENT
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  fullName     String
+  email        String    @unique
+  passwordHash String
+  phone        String?
+  dateOfBirth  DateTime?
+  role         Role
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  dentistProfile        Dentist?        @relation("UserDentist")
+  appointmentsAsPatient Appointment[]   @relation("PatientAppointments")
+  appointmentsCreated   Appointment[]   @relation("CreatedByStaff")
+  notifications         Notification[]
+
+  @@index([role])
+}
+
+model Dentist {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  specialty  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user           User            @relation("UserDentist", fields: [userId], references: [id], onDelete: Cascade)
+  workingHours   WorkingHours[]
+  appointments   Appointment[]
+  treatmentNotes TreatmentNote[]
+}
+
+// One row per (dentist, day-of-week). Simple recurring weekly pattern,
+// no date-specific overrides, per the approved MVP scope.
+model WorkingHours {
+  id         Int    @id @default(autoincrement())
+  dentistId  Int
+  dayOfWeek  Int // 0 = Sunday ... 6 = Saturday
+  startTime  String // "09:00" - kept as a simple string, no timezone/date math needed
+  endTime    String // "18:00"
+
+  dentist Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+
+  @@unique([dentistId, dayOfWeek])
+}
+
+model Service {
+  id              Int      @id @default(autoincrement())
+  name            String
+  durationMinutes Int // 30 or 60
+  price           Decimal  @db.Decimal(10, 2)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  appointments Appointment[]
+}
+
+model Appointment {
+  id              Int               @id @default(autoincrement())
+  patientId       Int
+  dentistId       Int
+  serviceId       Int
+  createdById     Int // who made the booking (patient or staff)
+  appointmentDate DateTime          @db.Date
+  startTime       String // "10:00"
+  endTime         String // "10:30"
+  status          AppointmentStatus @default(BOOKED)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  patient       User            @relation("PatientAppointments", fields: [patientId], references: [id])
+  dentist       Dentist         @relation(fields: [dentistId], references: [id])
+  service       Service         @relation(fields: [serviceId], references: [id])
+  createdBy     User            @relation("CreatedByStaff", fields: [createdById], references: [id])
+  payment       Payment?
+  treatmentNote TreatmentNote?
+  notifications Notification[]
+
+  // The service performs a friendly overlap pre-check, while the PostgreSQL
+  // exclusion constraint in migration 20260920003000 is the concurrency-safe
+  // source of truth. Prisma cannot represent exclusion constraints directly.
+  @@index([dentistId, appointmentDate])
+  @@index([patientId])
+  @@index([appointmentDate])
+}
+
+model Payment {
+  id            Int           @id @default(autoincrement())
+  appointmentId Int           @unique
+  amount        Decimal       @db.Decimal(10, 2)
+  status        PaymentStatus @default(UNPAID)
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+}
+
+// Optional, one-to-one with an appointment. Visible only to the writing
+// dentist and Admin — enforced in the service layer, not the schema.
+model TreatmentNote {
+  id            Int      @id @default(autoincrement())
+  appointmentId Int      @unique
+  dentistId     Int
+  noteText      String   @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  dentist     Dentist     @relation(fields: [dentistId], references: [id])
+}
+
+model Notification {
+  id                   Int      @id @default(autoincrement())
+  userId               Int // recipient
+  relatedAppointmentId Int?
+  type                 String // e.g. "APPOINTMENT_BOOKED"
+  message              String
+  isRead               Boolean  @default(false)
+  createdAt            DateTime @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [relatedAppointmentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+}

@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Environment variables - never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Local temporary files
+*.tmp
+*.temp
+# Local database schema backup
+server/old-database-schema.prisma

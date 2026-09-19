@@ -1,0 +1,118 @@
+/* src/styles/theme.css
+   Design tokens from the approved UI/UX spec, implemented as CSS variables
+   and Bootstrap overrides. Keeping this in one file means every screen
+   pulls from the same source of truth for color/type instead of
+   hardcoding hex codes in each component. */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Brand */
+  --color-primary: #0f766e;
+  --color-primary-dark: #0b5952;
+  --color-secondary: #38bdf8;
+
+  /* Status */
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+
+  /* Neutrals */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-border: #e2e8f0;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-disabled: #cbd5e1;
+
+  --font-family-base: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+  /* Bootstrap variable overrides so built-in components (buttons, alerts,
+     badges) pick up our palette without us rewriting them from scratch. */
+  --bs-primary: var(--color-primary);
+  --bs-primary-rgb: 15, 118, 110;
+  --bs-body-font-family: var(--font-family-base);
+  --bs-body-color: var(--color-text-primary);
+  --bs-body-bg: var(--color-bg);
+  --bs-border-color: var(--color-border);
+}
+
+body {
+  font-family: var(--font-family-base);
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+}
+
+h1, .h1 { font-weight: 700; font-size: 28px; }
+h2, .h2 { font-weight: 600; font-size: 20px; }
+h3, .h3 { font-weight: 600; font-size: 16px; }
+small, .text-helper { font-size: 12px; color: var(--color-text-secondary); }
+
+/* Primary button: solid teal, matches spec's "Primary (Brand)" role */
+.btn-primary {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+}
+.btn-primary:disabled {
+  background-color: var(--color-disabled);
+  border-color: var(--color-disabled);
+}
+
+/* Secondary button: white bg, teal border/text */
+.btn-outline-primary {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  border-radius: var(--radius-sm);
+}
+.btn-outline-primary:hover {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+/* Status badges — pill shape, tinted background, solid text,
+   matching the "status color system" used across every screen. */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.badge-status-booked { background-color: rgba(217, 119, 6, 0.12); color: var(--color-warning); }
+.badge-status-confirmed { background-color: rgba(15, 118, 110, 0.12); color: var(--color-primary); }
+.badge-status-completed { background-color: rgba(22, 163, 74, 0.12); color: var(--color-success); }
+.badge-status-cancelled { background-color: rgba(220, 38, 38, 0.12); color: var(--color-danger); }
+.badge-status-unpaid { background-color: rgba(217, 119, 6, 0.12); color: var(--color-warning); }
+.badge-status-paid { background-color: rgba(22, 163, 74, 0.12); color: var(--color-success); }
+
+/* Visible keyboard focus ring everywhere — accessibility requirement,
+   not just the default (often too faint) browser outline. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.form-control:focus {
+  outline: 3px solid rgba(56, 189, 248, 0.6);
+  outline-offset: 2px;
+  box-shadow: none !important;
+}
