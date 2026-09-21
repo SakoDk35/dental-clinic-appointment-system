@@ -6,12 +6,18 @@
 // numbers appointments alone can't give: revenue and active patient count.
 
 import { prisma } from "../../lib/prisma";
+import { getClinicDateTimeParts } from "../../utils/clinicTime";
 
 export async function getAdminStats() {
-  const now = new Date();
-  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const clinicToday = getClinicDateTimeParts().date;
+  const [year, month, day] = clinicToday.split("-").map(Number);
+
+  // Appointment dates are stored as PostgreSQL DATE values and represented
+  // by Prisma at UTC midnight. Derive the calendar date from clinic-local
+  // time first, then construct those DATE boundaries in UTC.
+  const todayUtc = new Date(Date.UTC(year, month - 1, day));
+  const startOfMonth = new Date(Date.UTC(year, month - 1, 1));
+  const startOfNextMonth = new Date(Date.UTC(year, month, 1));
 
   const todaysAppointments = await prisma.appointment.count({
     where: { appointmentDate: todayUtc, status: { not: "CANCELLED" } },

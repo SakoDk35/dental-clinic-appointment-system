@@ -5,7 +5,7 @@ import type { Payment } from "../types";
 interface ListPaymentsFilters {
   from?: string;
   to?: string;
-  status?: "UNPAID" | "PAID";
+  status?: "UNPAID" | "PAID" | "VOID";
 }
 
 export async function listPayments(token: string, filters: ListPaymentsFilters = {}): Promise<Payment[]> {

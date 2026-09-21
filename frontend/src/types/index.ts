@@ -7,7 +7,7 @@ export type Role = "ADMIN" | "RECEPTIONIST" | "DENTIST" | "PATIENT";
 
 export type AppointmentStatus = "BOOKED" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
 
-export type PaymentStatus = "UNPAID" | "PAID";
+export type PaymentStatus = "UNPAID" | "PAID" | "VOID";
 
 export interface User {
   id: number;
@@ -38,6 +38,16 @@ export interface WorkingHours {
   endTime: string; // "18:00"
 }
 
+export interface DentistTimeOff {
+  id: number;
+  dentistId: number;
+  date: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  fullDay: boolean;
+  createdAt: string;
+}
+
 export interface Service {
   id: number;
   name: string;
@@ -61,6 +71,7 @@ export interface Appointment {
 export interface Payment {
   id: number;
   appointmentId: number;
+  appointmentStatus: AppointmentStatus;
   patientName: string;
   serviceName: string;
   date: string;
@@ -83,6 +94,7 @@ export interface AppNotification {
   message: string;
   isRead: boolean;
   createdAt: string;
+  relatedAppointmentId?: number | null;
 }
 
 // Generic API error shape, matching the REST spec's error contract.

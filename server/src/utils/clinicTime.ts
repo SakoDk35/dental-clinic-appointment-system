@@ -36,3 +36,8 @@ export function isClinicDateTimeInPast(date: string, time: string, now = new Dat
   const clinicNow = getClinicDateTimeParts(now);
   return `${date}T${time}` < `${clinicNow.date}T${clinicNow.time}`;
 }
+
+export function isClinicDateTimeInFuture(date: string, time: string, now = new Date()): boolean {
+  const clinicNow = getClinicDateTimeParts(now);
+  return `${date}T${time}` > `${clinicNow.date}T${clinicNow.time}`;
+}

@@ -11,7 +11,7 @@ import {
   updateTreatmentNote,
 } from "../../api/appointmentsApi";
 import type { Appointment } from "../../types";
-import { getClinicToday, shiftDate } from "../../utils/clinicTime";
+import { getClinicToday, hasClinicDateTimePassed, shiftDate } from "../../utils/clinicTime";
 import { VALIDATION_LIMITS } from "../../utils/validationLimits";
 
 export function MySchedulePage() {
@@ -50,7 +50,7 @@ export function MySchedulePage() {
         <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setDate(shiftDate(date, -1))}>
           ← Prev
         </button>
-        <input type="date" className="form-control" style={{ maxWidth: 170 }} value={date} onChange={(e) => setDate(e.target.value)} />
+        <input type="date" className="form-control" style={{ maxWidth: 170 }} value={date} onChange={(e) => setDate(e.target.value)} aria-label="Appointment date" />
         <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setDate(shiftDate(date, 1))}>
           Next →
         </button>
@@ -85,12 +85,14 @@ export function MySchedulePage() {
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <StatusBadge status={a.status} />
-                  {a.status !== "COMPLETED" && a.status !== "CANCELLED" && (
+                  {a.status !== "COMPLETED" &&
+                    a.status !== "CANCELLED" &&
+                    hasClinicDateTimePassed(a.appointmentDate, a.startTime) && (
                     <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => handleComplete(a.id)}>
                       Mark Completed
                     </button>
                   )}
-                  {a.status !== "CANCELLED" && (
+                  {a.status === "COMPLETED" && (
                     <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setNoteAppointment(a)}>
                       Note
                     </button>
@@ -151,7 +153,7 @@ function TreatmentNoteModal({ appointment, onClose }: { appointment: Appointment
   }
 
   return (
-    <div className="modal d-block" tabIndex={-1} role="dialog" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
+    <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
       <div className="modal-dialog" role="document" onClick={(e) => e.stopPropagation()}>
         <div className="modal-content">
           <div className="modal-header">

@@ -15,10 +15,13 @@ export function ManageUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [resettingUser, setResettingUser] = useState<User | null>(null);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   function load() {
     if (!token) return;
     setIsLoading(true);
+    setError(null);
     // Fetch only staff roles. Dentist accounts appear here too (read-only
     // for account status/password) but are created and edited on the
     // Dentists page, since they need a specialty and working hours.
@@ -34,6 +37,12 @@ export function ManageUsersPage() {
 
   useEffect(load, [token]);
 
+  useEffect(() => {
+    if (!successMessage) return;
+    const timeoutId = window.setTimeout(() => setSuccessMessage(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [successMessage]);
+
   return (
     <AppShell pageTitle="Staff Accounts">
       <div className="d-flex justify-content-end mb-3">
@@ -48,9 +57,13 @@ export function ManageUsersPage() {
         </div>
       )}
 
+      {successMessage && <div className="alert alert-success py-2" role="status">{successMessage}</div>}
+
       <div className="card">
         {isLoading ? (
           <p className="text-helper p-3 mb-0">Loading...</p>
+        ) : users.length === 0 ? (
+          <p className="text-helper p-3 mb-0">No staff accounts found.</p>
         ) : (
           <div className="table-responsive">
             <table className="table mb-0">
@@ -84,13 +97,24 @@ export function ManageUsersPage() {
                           <button
                             type="button"
                             className={`btn btn-sm ${u.isActive ? "btn-outline-danger" : "btn-outline-success"}`}
+                            disabled={updatingId === u.id}
                             onClick={async () => {
                               if (!token) return;
-                              u.isActive ? await deactivateUser(token, u.id) : await activateUser(token, u.id);
-                              load();
+                              if (u.isActive && !window.confirm(`Deactivate ${u.fullName}'s staff account?`)) return;
+                              setError(null);
+                              setUpdatingId(u.id);
+                              try {
+                                u.isActive ? await deactivateUser(token, u.id) : await activateUser(token, u.id);
+                                setSuccessMessage(u.isActive ? "Staff account deactivated." : "Staff account activated.");
+                                load();
+                              } catch (err) {
+                                setError(err instanceof Error ? err.message : "Failed to update staff account.");
+                              } finally {
+                                setUpdatingId(null);
+                              }
                             }}
                           >
-                            {u.isActive ? "Deactivate" : "Activate"}
+                            {updatingId === u.id ? "Updating..." : u.isActive ? "Deactivate" : "Activate"}
                           </button>
                         )}
                       </div>
@@ -104,7 +128,7 @@ export function ManageUsersPage() {
       </div>
 
       {showCreateModal && (
-        <CreateStaffModal onClose={() => setShowCreateModal(false)} onCreated={() => { setShowCreateModal(false); load(); }} />
+        <CreateStaffModal onClose={() => setShowCreateModal(false)} onCreated={() => { setShowCreateModal(false); setSuccessMessage("Staff account created."); load(); }} />
       )}
       {resettingUser && (
         <ResetPasswordModal user={resettingUser} onClose={() => setResettingUser(null)} />
@@ -143,7 +167,7 @@ function CreateStaffModal({ onClose, onCreated }: { onClose: () => void; onCreat
   }
 
   return (
-    <div className="modal d-block" tabIndex={-1} role="dialog" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
+    <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
       <div className="modal-dialog" role="document" onClick={(e) => e.stopPropagation()}>
         <div className="modal-content">
           <div className="modal-header">
@@ -208,7 +232,7 @@ function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void
   }
 
   return (
-    <div className="modal d-block" tabIndex={-1} role="dialog" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
+    <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
       <div className="modal-dialog" role="document" onClick={(e) => e.stopPropagation()}>
         <div className="modal-content">
           <div className="modal-header">

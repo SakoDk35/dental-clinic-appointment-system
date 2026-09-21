@@ -7,6 +7,7 @@ import {
   validateCreateAppointmentInput,
   validateRescheduleInput,
   validateAvailableSlotsQuery,
+  validateListAppointmentsQuery,
 } from "./appointments.validation";
 import {
   getAvailableSlots,
@@ -82,7 +83,11 @@ export async function create(req: Request, res: Response, next: NextFunction) {
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
     const requester = req.user!;
-    const date = typeof req.query.date === "string" ? req.query.date : undefined;
+    const { date, status, search } = validateListAppointmentsQuery({
+      date: req.query.date,
+      status: req.query.status,
+      search: req.query.search,
+    });
     const dentistId = req.query.dentistId ? Number(req.query.dentistId) : undefined;
     const patientId = req.query.patientId ? Number(req.query.patientId) : undefined;
 
@@ -92,6 +97,8 @@ export async function list(req: Request, res: Response, next: NextFunction) {
       date,
       dentistId: Number.isInteger(dentistId) ? dentistId : undefined,
       patientId: Number.isInteger(patientId) ? patientId : undefined,
+      status,
+      search,
     });
 
     res.status(200).json({ success: true, data: appointments });
@@ -143,7 +150,11 @@ export async function reschedule(req: Request, res: Response, next: NextFunction
     const { dentistId, appointmentDate, startTime } = req.body ?? {};
     validateRescheduleInput({ dentistId, appointmentDate, startTime });
 
-    const appointment = await rescheduleAppointment(id, { dentistId, appointmentDate, startTime });
+    const appointment = await rescheduleAppointment(
+      id,
+      { dentistId, appointmentDate, startTime },
+      req.user!
+    );
     res.status(200).json({ success: true, data: appointment });
   } catch (err) {
     next(err);

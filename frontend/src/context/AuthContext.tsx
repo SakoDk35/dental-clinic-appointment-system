@@ -18,14 +18,39 @@ export const AuthContext = createContext<AuthContextValue | undefined>(undefined
 
 const STORAGE_KEY = "dental_clinic_auth";
 
+interface StoredAuth {
+  user: User;
+  token: string;
+}
+
+function readStoredAuth(): StoredAuth | null {
+  const stored = sessionStorage.getItem(STORAGE_KEY);
+  if (!stored) return null;
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<StoredAuth>;
+    if (
+      typeof parsed.token !== "string" ||
+      !parsed.token ||
+      !parsed.user ||
+      typeof parsed.user.id !== "number" ||
+      typeof parsed.user.role !== "string"
+    ) {
+      throw new Error("Invalid stored session shape.");
+    }
+    return parsed as StoredAuth;
+  } catch {
+    sessionStorage.removeItem(STORAGE_KEY);
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    return stored ? (JSON.parse(stored).user as User) : null;
+    return readStoredAuth()?.user ?? null;
   });
   const [token, setToken] = useState<string | null>(() => {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    return stored ? (JSON.parse(stored).token as string) : null;
+    return readStoredAuth()?.token ?? null;
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

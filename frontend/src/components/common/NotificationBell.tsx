@@ -1,5 +1,6 @@
 // src/components/common/NotificationBell.tsx
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from "../../api/notificationsApi";
 import { useAuth } from "../../hooks/useAuth";
 import type { AppNotification } from "../../types";
@@ -15,7 +16,8 @@ function timeAgo(isoString: string): string {
 }
 
 export function NotificationBell() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,47 +46,45 @@ export function NotificationBell() {
     setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
   }
 
-  async function handleItemClick(id: number) {
+  async function handleItemClick(notification: AppNotification) {
     if (!token) return;
-    await markNotificationRead(token, id);
-    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+    await markNotificationRead(token, notification.id);
+    setItems((prev) => prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n)));
+
+    if (notification.relatedAppointmentId && user) {
+      const destination = user.role === "PATIENT"
+        ? "/patient/appointments"
+        : user.role === "DENTIST"
+          ? "/dentist/schedule"
+          : "/appointments/calendar";
+      setIsOpen(false);
+      navigate(destination);
+    }
   }
 
   return (
     <div className="position-relative" ref={containerRef}>
       <button
         type="button"
-        className="btn btn-link position-relative p-2"
+        className="btn notification-button position-relative"
         onClick={() => setIsOpen((v) => !v)}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <span style={{ fontSize: 18 }} aria-hidden="true">
-          🔔
-        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M10 21h4" />
+        </svg>
         {unreadCount > 0 && (
-          <span
-            className="position-absolute badge rounded-pill"
-            style={{
-              top: 2,
-              right: 0,
-              backgroundColor: "var(--color-danger)",
-              fontSize: 10,
-              color: "white",
-            }}
-          >
+          <span className="notification-count position-absolute badge rounded-pill">
             {unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div
-          className="card position-absolute end-0 mt-1"
-          style={{ width: 320, maxHeight: 400, overflowY: "auto", zIndex: 1060 }}
-          role="menu"
-        >
+        <div className="card notification-menu position-absolute end-0 mt-2" role="menu">
           <div className="d-flex justify-content-between align-items-center p-2 border-bottom">
             <h3 className="h3 mb-0">Notifications</h3>
             {unreadCount > 0 && (
@@ -102,8 +102,8 @@ export function NotificationBell() {
                   <button
                     type="button"
                     className="btn w-100 text-start p-2 border-bottom rounded-0"
-                    style={{ backgroundColor: n.isRead ? "transparent" : "rgba(15,118,110,0.06)" }}
-                    onClick={() => handleItemClick(n.id)}
+                    style={{ backgroundColor: n.isRead ? "transparent" : "rgba(8,117,201,0.06)" }}
+                    onClick={() => handleItemClick(n)}
                   >
                     <div style={{ fontSize: 13 }}>{n.message}</div>
                     <div className="text-helper">{timeAgo(n.createdAt)}</div>

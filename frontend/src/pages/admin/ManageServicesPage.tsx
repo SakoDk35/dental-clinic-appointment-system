@@ -13,10 +13,13 @@ export function ManageServicesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingService, setEditingService] = useState<Service | "new" | null>(null);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   function load() {
     if (!token) return;
     setIsLoading(true);
+    setError(null);
     listServices(token)
       .then(setServices)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load services."))
@@ -24,6 +27,12 @@ export function ManageServicesPage() {
   }
 
   useEffect(load, [token]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timeoutId = window.setTimeout(() => setSuccessMessage(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [successMessage]);
 
   return (
     <AppShell pageTitle="Services">
@@ -38,6 +47,8 @@ export function ManageServicesPage() {
           {error}
         </div>
       )}
+
+      {successMessage && <div className="alert alert-success py-2" role="status">{successMessage}</div>}
 
       <div className="card">
         {isLoading ? (
@@ -69,11 +80,22 @@ export function ManageServicesPage() {
                           type="checkbox"
                           role="switch"
                           checked={s.isActive}
+                          disabled={updatingId === s.id}
                           aria-label={`${s.name} active`}
                           onChange={async () => {
                             if (!token) return;
-                            s.isActive ? await deactivateService(token, s.id) : await activateService(token, s.id);
-                            load();
+                            if (s.isActive && !window.confirm(`Deactivate ${s.name}? It will no longer be available for new bookings.`)) return;
+                            setError(null);
+                            setUpdatingId(s.id);
+                            try {
+                              s.isActive ? await deactivateService(token, s.id) : await activateService(token, s.id);
+                              setSuccessMessage(s.isActive ? "Service deactivated." : "Service activated.");
+                              load();
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : "Failed to update service.");
+                            } finally {
+                              setUpdatingId(null);
+                            }
                           }}
                         />
                       </div>
@@ -96,6 +118,7 @@ export function ManageServicesPage() {
           service={editingService === "new" ? null : editingService}
           onClose={() => setEditingService(null)}
           onSaved={() => {
+            setSuccessMessage(editingService === "new" ? "Service created." : "Service updated.");
             setEditingService(null);
             load();
           }}
@@ -146,7 +169,7 @@ function ServiceModal({
   }
 
   return (
-    <div className="modal d-block" tabIndex={-1} role="dialog" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
+    <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
       <div className="modal-dialog" role="document" onClick={(e) => e.stopPropagation()}>
         <div className="modal-content">
           <div className="modal-header">

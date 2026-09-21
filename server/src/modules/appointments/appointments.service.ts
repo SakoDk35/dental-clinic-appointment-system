@@ -7,8 +7,16 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../middleware/errorHandler";
-import { getClinicDateTimeParts, isClinicDateTimeInPast } from "../../utils/clinicTime";
+import {
+  getClinicDateTimeParts,
+  isClinicDateTimeInFuture,
+  isClinicDateTimeInPast,
+} from "../../utils/clinicTime";
 import { createNotification, notifyStaff } from "../notifications/notifications.service";
+import {
+  assertNoDentistTimeOffConflict,
+  getDentistTimeOffIntervals,
+} from "../dentists/dentists.service";
 
 // ---- small time helpers (plain strings/numbers, no date library needed) ----
 
@@ -137,6 +145,7 @@ export async function getAvailableSlots(dentistId: number, dateStr: string, serv
     start: timeToMinutes(a.startTime),
     end: timeToMinutes(a.endTime),
   }));
+  const blockedIntervals = await getDentistTimeOffIntervals(dentistId, dateStr);
 
   const workStart = timeToMinutes(hours.startTime);
   const workEnd = timeToMinutes(hours.endTime);
@@ -152,7 +161,8 @@ export async function getAvailableSlots(dentistId: number, dateStr: string, serv
   for (let start = workStart; start + duration <= workEnd; start += 30) {
     if (start < earliest) continue;
     const end = start + duration;
-    const conflicts = bookedIntervals.some((b) => intervalsOverlap(start, end, b.start, b.end));
+    const conflicts = [...bookedIntervals, ...blockedIntervals]
+      .some((b) => intervalsOverlap(start, end, b.start, b.end));
     if (!conflicts) {
       slots.push(minutesToTime(start));
     }
@@ -243,6 +253,7 @@ export async function createAppointment(input: CreateAppointmentInput) {
 
   assertNotInThePast(input.appointmentDate, input.startTime);
   await assertWithinWorkingHours(input.dentistId, input.appointmentDate, startMinutes, endMinutes);
+  await assertNoDentistTimeOffConflict(input.dentistId, input.appointmentDate, startMinutes, endMinutes);
   await assertSlotIsFree(input.dentistId, input.appointmentDate, startMinutes, endMinutes);
 
   let appointment: AppointmentWithRelations;
@@ -301,10 +312,12 @@ interface ListAppointmentsParams {
   date?: string;
   dentistId?: number;
   patientId?: number;
+  status?: "BOOKED" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+  search?: string;
 }
 
 export async function listAppointments(params: ListAppointmentsParams) {
-  const where: Record<string, unknown> = {};
+  const where: Prisma.AppointmentWhereInput = {};
 
   if (params.role === "PATIENT") {
     where.patientId = params.userId;
@@ -322,6 +335,18 @@ export async function listAppointments(params: ListAppointmentsParams) {
 
   if (params.date) {
     where.appointmentDate = dateStrToUtcDate(params.date);
+  }
+  if (params.status) {
+    where.status = params.status;
+  }
+  if (params.search) {
+    where.patient = {
+      OR: [
+        { fullName: { contains: params.search, mode: "insensitive" } },
+        { email: { contains: params.search, mode: "insensitive" } },
+        { phone: { contains: params.search, mode: "insensitive" } },
+      ],
+    };
   }
 
   const appointments = await prisma.appointment.findMany({
@@ -400,11 +425,26 @@ export async function cancelAppointment(id: number, requester: { role: string; u
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    const payment = await tx.payment.findUnique({ where: { appointmentId: id } });
+    if (payment?.status === "PAID") {
+      throw new AppError(
+        409,
+        "A paid appointment cannot be cancelled because refunds are not supported."
+      );
+    }
+
     const result = await tx.appointment.update({
       where: { id },
       data: { status: "CANCELLED" },
       include: APPOINTMENT_INCLUDE,
     });
+
+    if (payment?.status === "UNPAID") {
+      await tx.payment.update({
+        where: { appointmentId: id },
+        data: { status: "VOID", paidAt: null },
+      });
+    }
 
     await createNotification(tx, {
       userId: result.patientId,
@@ -437,6 +477,9 @@ export async function completeAppointment(id: number, dentistUserId: number) {
   if (appointment.status === "COMPLETED" || appointment.status === "CANCELLED") {
     throw new AppError(409, "This appointment can no longer be marked completed.");
   }
+  if (isClinicDateTimeInFuture(formatDate(appointment.appointmentDate), appointment.startTime)) {
+    throw new AppError(409, "A future appointment cannot be marked completed.");
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.appointment.update({
@@ -462,11 +505,32 @@ interface RescheduleInput {
   startTime?: string;
 }
 
-export async function rescheduleAppointment(id: number, input: RescheduleInput) {
+export async function rescheduleAppointment(
+  id: number,
+  input: RescheduleInput,
+  requester: { role: "ADMIN" | "RECEPTIONIST" | "DENTIST" | "PATIENT"; userId: number }
+) {
   const appointment = await getAppointmentOrThrow(id);
+
+  assertCanAccessAppointment(appointment, requester);
 
   if (appointment.status !== "BOOKED" && appointment.status !== "CONFIRMED") {
     throw new AppError(409, "This appointment can no longer be modified.");
+  }
+
+  if (
+    requester.role === "PATIENT" &&
+    !isClinicDateTimeInFuture(formatDate(appointment.appointmentDate), appointment.startTime)
+  ) {
+    throw new AppError(409, "Only future appointments can be rescheduled.");
+  }
+
+  if (
+    requester.role === "PATIENT" &&
+    input.dentistId !== undefined &&
+    input.dentistId !== appointment.dentistId
+  ) {
+    throw new AppError(403, "Patients cannot change the dentist while rescheduling.");
   }
 
   const dentistId = input.dentistId ?? appointment.dentistId;
@@ -487,6 +551,7 @@ export async function rescheduleAppointment(id: number, input: RescheduleInput) 
 
   assertNotInThePast(appointmentDate, startTime);
   await assertWithinWorkingHours(dentistId, appointmentDate, startMinutes, endMinutes);
+  await assertNoDentistTimeOffConflict(dentistId, appointmentDate, startMinutes, endMinutes);
   await assertSlotIsFree(dentistId, appointmentDate, startMinutes, endMinutes, id);
 
   let updated: AppointmentWithRelations;
@@ -510,6 +575,15 @@ export async function rescheduleAppointment(id: number, input: RescheduleInput) 
         relatedAppointmentId: result.id,
       });
 
+      if (requester.role === "PATIENT") {
+        await notifyStaff(
+          tx,
+          `${result.patient.fullName} rescheduled their appointment to ${appointmentDate} at ${startTime}.`,
+          "PATIENT_SELF_RESCHEDULED",
+          result.id
+        );
+      }
+
       return result;
     });
   } catch (error) {
@@ -527,6 +601,9 @@ export async function addTreatmentNote(appointmentId: number, dentistUserId: num
   if (appointment.dentist.user.id !== dentistUserId) {
     throw new AppError(403, "You can only add notes to your own appointments.");
   }
+  if (appointment.status !== "COMPLETED") {
+    throw new AppError(409, "Treatment notes can only be added to completed appointments.");
+  }
 
   const existing = await prisma.treatmentNote.findUnique({ where: { appointmentId } });
   if (existing) {
@@ -543,6 +620,9 @@ export async function updateTreatmentNote(appointmentId: number, dentistUserId: 
 
   if (appointment.dentist.user.id !== dentistUserId) {
     throw new AppError(403, "You can only edit notes on your own appointments.");
+  }
+  if (appointment.status !== "COMPLETED") {
+    throw new AppError(409, "Treatment notes can only be edited for completed appointments.");
   }
 
   const existing = await prisma.treatmentNote.findUnique({ where: { appointmentId } });

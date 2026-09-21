@@ -1,6 +1,6 @@
 // src/api/dentistsApi.ts
 import { apiRequest } from "./client";
-import type { Dentist, WorkingHours } from "../types";
+import type { Dentist, DentistTimeOff, WorkingHours } from "../types";
 
 export interface CreateDentistPayload {
   fullName: string;
@@ -50,4 +50,24 @@ export async function setWorkingHours(
     { method: "PUT", body: JSON.stringify({ workingHours }) },
     token
   );
+}
+
+export async function listDentistTimeOff(token: string, dentistId: number): Promise<DentistTimeOff[]> {
+  return apiRequest<DentistTimeOff[]>(`/dentists/${dentistId}/time-off`, { method: "GET" }, token);
+}
+
+export async function createDentistTimeOff(
+  token: string,
+  dentistId: number,
+  payload: { date: string; fullDay: boolean; startTime?: string; endTime?: string }
+): Promise<DentistTimeOff> {
+  return apiRequest<DentistTimeOff>(
+    `/dentists/${dentistId}/time-off`,
+    { method: "POST", body: JSON.stringify(payload) },
+    token
+  );
+}
+
+export async function deleteDentistTimeOff(token: string, dentistId: number, timeOffId: number): Promise<void> {
+  await apiRequest<null>(`/dentists/${dentistId}/time-off/${timeOffId}`, { method: "DELETE" }, token);
 }

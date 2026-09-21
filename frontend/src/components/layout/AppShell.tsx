@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { useAuth } from "../../hooks/useAuth";
+import "./AppShell.css";
 
 interface AppShellProps {
   pageTitle: string;
@@ -17,7 +18,7 @@ export function AppShell({ pageTitle, children }: AppShellProps) {
   if (!user) return null;
 
   return (
-    <div className="d-flex">
+    <div className={`app-shell ${isDesktopNavOpen ? "app-shell-sidebar-open" : ""}`}>
       <Sidebar
         role={user.role}
         isMobileOpen={isMobileNavOpen}
@@ -25,7 +26,7 @@ export function AppShell({ pageTitle, children }: AppShellProps) {
         onCloseMobile={() => setIsMobileNavOpen(false)}
       />
 
-      <div className="flex-grow-1" style={{ minWidth: 0 }}>
+      <div className="app-shell-content">
         <Header
           pageTitle={pageTitle}
           onToggleMobileNav={() =>
@@ -37,15 +38,7 @@ export function AppShell({ pageTitle, children }: AppShellProps) {
           isDesktopNavOpen={isDesktopNavOpen}
         />
 
-        <main
-          className="p-3 p-md-4"
-          style={{
-            maxWidth: isDesktopNavOpen ? 1280 : "none",
-            margin: "0 auto",
-          }}
-        >
-          {children}
-        </main>
+        <main className="app-main">{children}</main>
       </div>
     </div>
   );

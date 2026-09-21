@@ -30,6 +30,7 @@ enum AppointmentStatus {
 enum PaymentStatus {
   UNPAID
   PAID
+  VOID
 }
 
 model User {
@@ -44,23 +45,24 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  dentistProfile        Dentist?        @relation("UserDentist")
-  appointmentsAsPatient Appointment[]   @relation("PatientAppointments")
-  appointmentsCreated   Appointment[]   @relation("CreatedByStaff")
+  dentistProfile        Dentist?       @relation("UserDentist")
+  appointmentsAsPatient Appointment[]  @relation("PatientAppointments")
+  appointmentsCreated   Appointment[]  @relation("CreatedByStaff")
   notifications         Notification[]
 
   @@index([role])
 }
 
 model Dentist {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @unique
-  specialty  String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  specialty String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user           User            @relation("UserDentist", fields: [userId], references: [id], onDelete: Cascade)
+  user           User             @relation("UserDentist", fields: [userId], references: [id], onDelete: Cascade)
   workingHours   WorkingHours[]
+  timeOff        DentistTimeOff[]
   appointments   Appointment[]
   treatmentNotes TreatmentNote[]
 }
@@ -68,15 +70,29 @@ model Dentist {
 // One row per (dentist, day-of-week). Simple recurring weekly pattern,
 // no date-specific overrides, per the approved MVP scope.
 model WorkingHours {
-  id         Int    @id @default(autoincrement())
-  dentistId  Int
-  dayOfWeek  Int // 0 = Sunday ... 6 = Saturday
-  startTime  String // "09:00" - kept as a simple string, no timezone/date math needed
-  endTime    String // "18:00"
+  id        Int    @id @default(autoincrement())
+  dentistId Int
+  dayOfWeek Int // 0 = Sunday ... 6 = Saturday
+  startTime String // "09:00" - kept as a simple string, no timezone/date math needed
+  endTime   String // "18:00"
 
   dentist Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
 
   @@unique([dentistId, dayOfWeek])
+}
+
+// Date-specific availability exceptions. Null start/end means the whole day.
+model DentistTimeOff {
+  id        Int      @id @default(autoincrement())
+  dentistId Int
+  date      DateTime @db.Date
+  startTime String?
+  endTime   String?
+  createdAt DateTime @default(now())
+
+  dentist Dentist @relation(fields: [dentistId], references: [id], onDelete: Cascade)
+
+  @@index([dentistId, date])
 }
 
 model Service {
@@ -104,10 +120,10 @@ model Appointment {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  patient       User            @relation("PatientAppointments", fields: [patientId], references: [id])
-  dentist       Dentist         @relation(fields: [dentistId], references: [id])
-  service       Service         @relation(fields: [serviceId], references: [id])
-  createdBy     User            @relation("CreatedByStaff", fields: [createdById], references: [id])
+  patient       User           @relation("PatientAppointments", fields: [patientId], references: [id])
+  dentist       Dentist        @relation(fields: [dentistId], references: [id])
+  service       Service        @relation(fields: [serviceId], references: [id])
+  createdBy     User           @relation("CreatedByStaff", fields: [createdById], references: [id])
   payment       Payment?
   treatmentNote TreatmentNote?
   notifications Notification[]

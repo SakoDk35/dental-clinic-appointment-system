@@ -22,6 +22,7 @@ export function AppointmentForm({ showPatientSelector, onBooked, onCancel }: App
 
   const [services, setServices] = useState<Service[]>([]);
   const [dentists, setDentists] = useState<Dentist[]>([]);
+  const [isLoadingOptions, setIsLoadingOptions] = useState(true);
   const [serviceId, setServiceId] = useState<number | "">("");
   const [dentistId, setDentistId] = useState<number | "">("");
   const [date, setDate] = useState(getClinicToday());
@@ -32,20 +33,23 @@ export function AppointmentForm({ showPatientSelector, onBooked, onCancel }: App
   const [patientSearch, setPatientSearch] = useState("");
   const [patientResults, setPatientResults] = useState<User[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<User | null>(null);
+  const [isSearchingPatients, setIsSearchingPatients] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!token) return;
-    listServices(token)
-      .then((all) => setServices(all.filter((s) => s.isActive)))
-      .catch(() => setServices([]));
-    // Staff get inactive dentists too (the management page needs them), so
-    // filter here — a deactivated dentist must never be bookable.
-    listDentists(token)
-      .then((all) => setDentists(all.filter((d) => d.isActive)))
-      .catch(() => setDentists([]));
+    setIsLoadingOptions(true);
+    Promise.all([listServices(token), listDentists(token)])
+      .then(([allServices, allDentists]) => {
+        setServices(allServices.filter((service) => service.isActive));
+        // Staff get inactive dentists too (the management page needs them),
+        // so filter here — a deactivated dentist must never be bookable.
+        setDentists(allDentists.filter((dentist) => dentist.isActive));
+      })
+      .catch(() => setError("Unable to load booking options. Please try again."))
+      .finally(() => setIsLoadingOptions(false));
   }, [token]);
 
   useEffect(() => {
@@ -63,8 +67,17 @@ export function AppointmentForm({ showPatientSelector, onBooked, onCancel }: App
 
   async function handlePatientSearch() {
     if (!token || !patientSearch.trim()) return;
-    const results = await listPatients(token, patientSearch.trim());
-    setPatientResults(results);
+    setError(null);
+    setIsSearchingPatients(true);
+    try {
+      const results = await listPatients(token, patientSearch.trim());
+      setPatientResults(results);
+    } catch {
+      setPatientResults([]);
+      setError("Unable to search patients. Please try again.");
+    } finally {
+      setIsSearchingPatients(false);
+    }
   }
 
   async function handleSubmit() {
@@ -137,8 +150,8 @@ export function AppointmentForm({ showPatientSelector, onBooked, onCancel }: App
                   onChange={(e) => setPatientSearch(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handlePatientSearch())}
                 />
-                <button type="button" className="btn btn-outline-secondary" onClick={handlePatientSearch}>
-                  Search
+                <button type="button" className="btn btn-outline-secondary" onClick={handlePatientSearch} disabled={isSearchingPatients}>
+                  {isSearchingPatients ? "Searching..." : "Search"}
                 </button>
               </div>
               {patientResults.length > 0 && (
@@ -172,9 +185,10 @@ export function AppointmentForm({ showPatientSelector, onBooked, onCancel }: App
           id="serviceSelect"
           className="form-select"
           value={serviceId}
+          disabled={isLoadingOptions}
           onChange={(e) => setServiceId(e.target.value ? Number(e.target.value) : "")}
         >
-          <option value="">Select a service...</option>
+          <option value="">{isLoadingOptions ? "Loading services..." : "Select a service..."}</option>
           {services.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name} — {s.durationMinutes} min — {s.price.toLocaleString()} AMD
@@ -191,9 +205,10 @@ export function AppointmentForm({ showPatientSelector, onBooked, onCancel }: App
           id="dentistSelect"
           className="form-select"
           value={dentistId}
+          disabled={isLoadingOptions}
           onChange={(e) => setDentistId(e.target.value ? Number(e.target.value) : "")}
         >
-          <option value="">Select a dentist...</option>
+          <option value="">{isLoadingOptions ? "Loading dentists..." : "Select a dentist..."}</option>
           {dentists.map((d) => (
             <option key={d.id} value={d.id}>
               {d.fullName}

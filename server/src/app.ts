@@ -15,11 +15,26 @@ import { appointmentsRoutes } from "./modules/appointments/appointments.routes";
 import { paymentsRoutes } from "./modules/payments/payments.routes";
 import { notificationsRoutes } from "./modules/notifications/notifications.routes";
 import { dashboardRoutes } from "./modules/dashboard/dashboard.routes";
-import { errorHandler } from "./middleware/errorHandler";
+import { AppError, errorHandler } from "./middleware/errorHandler";
 
 export const app = express();
 
-app.use(cors());
+const allowedOrigins = (process.env.FRONTEND_URL ?? "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+        callback(null, true);
+        return;
+      }
+      callback(new AppError(403, "This origin is not allowed."));
+    },
+  })
+);
 app.use(express.json());
 
 // Basic infra check: confirms the server is up AND can reach the database.
@@ -41,6 +56,10 @@ app.use("/api/v1/appointments", appointmentsRoutes);
 app.use("/api/v1/payments", paymentsRoutes);
 app.use("/api/v1/notifications", notificationsRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
+
+app.use("/api", (_req, res) => {
+  res.status(404).json({ success: false, message: "API route not found" });
+});
 
 // Must be registered LAST — Express only treats a 4-arg function as an
 // error handler, and it only catches errors from routes defined above it.

@@ -13,15 +13,19 @@ export function PatientDashboard() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
     const today = getClinicToday();
-    listAppointments(token).then((data) => {
-      // "Upcoming" means exactly that — exclude cancelled and past dates.
-      setAppointments(data.filter((a) => a.status !== "CANCELLED" && a.appointmentDate >= today));
-      setIsLoading(false);
-    });
+    setError(null);
+    listAppointments(token)
+      .then((data) => {
+        // "Upcoming" means exactly that — exclude cancelled and past dates.
+        setAppointments(data.filter((a) => a.status !== "CANCELLED" && a.appointmentDate >= today));
+      })
+      .catch(() => setError("Unable to load your appointments. Please try again."))
+      .finally(() => setIsLoading(false));
   }, [token]);
 
   return (
@@ -36,11 +40,13 @@ export function PatientDashboard() {
         </button>
       </div>
 
+      {error && <div className="alert alert-danger" role="alert">{error}</div>}
+
       <div className="card p-3">
         <h2 className="h2 mb-3">Upcoming Appointments</h2>
 
-        {isLoading ? (
-          <p className="text-helper">Loading...</p>
+        {error ? null : isLoading ? (
+          <p className="text-helper">Loading upcoming appointments...</p>
         ) : appointments.length === 0 ? (
           <p className="text-helper mb-0">You have no upcoming appointments. Use the button above to book one.</p>
         ) : (

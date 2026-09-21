@@ -14,13 +14,15 @@ export function ReceptionistDashboard() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
-    listAppointments(token).then((data) => {
-      setAppointments(data);
-      setIsLoading(false);
-    });
+    setError(null);
+    listAppointments(token)
+      .then(setAppointments)
+      .catch(() => setError("Unable to load appointments. Please try again."))
+      .finally(() => setIsLoading(false));
   }, [token]);
 
   const today = getClinicToday();
@@ -29,17 +31,18 @@ export function ReceptionistDashboard() {
 
   return (
     <AppShell pageTitle="Dashboard">
+      {error && <div className="alert alert-danger" role="alert">{error}</div>}
       {/* No revenue/financial stat cards here — Receptionist role is
           intentionally scoped to scheduling info only, per the approved
           permissions table. */}
       <div className="row g-3 mb-3">
         <div className="col-6 col-md-4">
-          <StatCard label="Today's Appointments" value={String(todaysAppointments.length)} icon="C" />
+          <StatCard label="Today's Appointments" value={isLoading ? "—" : String(todaysAppointments.length)} icon="C" />
         </div>
         <div className="col-6 col-md-4">
           <StatCard
             label="Upcoming Appointments"
-            value={String(upcomingAppointments.length)}
+            value={isLoading ? "—" : String(upcomingAppointments.length)}
             icon="U"
             accentColor="var(--color-secondary)"
           />
@@ -47,7 +50,7 @@ export function ReceptionistDashboard() {
         <div className="col-6 col-md-4">
           <StatCard
             label="Booked (Unconfirmed)"
-            value={String(appointments.filter((a) => a.status === "BOOKED").length)}
+            value={isLoading ? "—" : String(appointments.filter((a) => a.status === "BOOKED").length)}
             icon="!"
             accentColor="var(--color-warning)"
           />
@@ -62,7 +65,7 @@ export function ReceptionistDashboard() {
           </button>
         </div>
 
-        {isLoading ? (
+        {error ? null : isLoading ? (
           <p className="text-helper">Loading...</p>
         ) : todaysAppointments.length === 0 ? (
           <p className="text-helper mb-0">No appointments scheduled for today.</p>

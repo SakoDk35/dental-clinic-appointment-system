@@ -5,12 +5,14 @@
 // frontend never needs to pass userId/role for that anymore.
 
 import { apiRequest } from "./client";
-import type { Appointment, TreatmentNote } from "../types";
+import type { Appointment, AppointmentStatus, TreatmentNote } from "../types";
 
 interface ListAppointmentsFilters {
   date?: string; // "YYYY-MM-DD"
   dentistId?: number; // staff-only filter
   patientId?: number; // staff-only filter
+  status?: AppointmentStatus;
+  search?: string;
 }
 
 export async function listAppointments(token: string, filters: ListAppointmentsFilters = {}): Promise<Appointment[]> {
@@ -18,6 +20,8 @@ export async function listAppointments(token: string, filters: ListAppointmentsF
   if (filters.date) params.set("date", filters.date);
   if (filters.dentistId) params.set("dentistId", String(filters.dentistId));
   if (filters.patientId) params.set("patientId", String(filters.patientId));
+  if (filters.status) params.set("status", filters.status);
+  if (filters.search) params.set("search", filters.search);
   const query = params.toString() ? `?${params.toString()}` : "";
 
   return apiRequest<Appointment[]>(`/appointments${query}`, { method: "GET" }, token);

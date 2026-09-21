@@ -34,7 +34,7 @@ appointmentsRoutes.get("/:id", getOne);
 appointmentsRoutes.patch("/:id/confirm", authorize(["RECEPTIONIST", "ADMIN"]), confirm);
 appointmentsRoutes.patch("/:id/cancel", authorize(["PATIENT", "RECEPTIONIST", "ADMIN"]), cancel);
 appointmentsRoutes.patch("/:id/complete", authorize(["DENTIST"]), complete);
-appointmentsRoutes.patch("/:id/reschedule", authorize(["RECEPTIONIST", "ADMIN"]), reschedule);
+appointmentsRoutes.patch("/:id/reschedule", authorize(["PATIENT", "RECEPTIONIST", "ADMIN"]), reschedule);
 
 appointmentsRoutes.post("/:id/notes", authorize(["DENTIST"]), addNote);
 appointmentsRoutes.patch("/:id/notes", authorize(["DENTIST"]), editNote);

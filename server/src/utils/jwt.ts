@@ -6,7 +6,15 @@
 import jwt from "jsonwebtoken";
 import type { Role } from "@prisma/client";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret-change-me";
+function readJwtSecret(): string {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret || secret.length < 32) {
+    throw new Error("JWT_SECRET must be configured with at least 32 characters.");
+  }
+  return secret;
+}
+
+const JWT_SECRET = readJwtSecret();
 
 // 8 hours ~ one clinic shift. Easy to change if that's not the right call.
 const JWT_EXPIRES_IN = "8h";

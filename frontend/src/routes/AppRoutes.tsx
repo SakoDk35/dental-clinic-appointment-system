@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
 import { ProtectedRoute } from "./ProtectedRoute";
+import { NotFoundPage } from "../pages/NotFoundPage";
 
 import { AdminDashboard } from "../pages/admin/AdminDashboard";
 import { ReceptionistDashboard } from "../pages/receptionist/ReceptionistDashboard";
@@ -162,7 +163,7 @@ export function AppRoutes() {
       />
 
       <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

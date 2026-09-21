@@ -6,7 +6,7 @@
 // for a simplified list view on mobile; using it everywhere keeps this
 // screen to one implementation instead of two).
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { AppShell } from "../../components/layout/AppShell";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import { AppointmentForm } from "../../components/appointments/AppointmentForm";
@@ -20,17 +20,22 @@ import {
   getAvailableSlots,
   getTreatmentNote,
 } from "../../api/appointmentsApi";
-import type { Appointment, Dentist, TreatmentNote } from "../../types";
+import type { Appointment, AppointmentStatus, Dentist, TreatmentNote } from "../../types";
 import { getClinicToday, shiftDate } from "../../utils/clinicTime";
 
 export function AppointmentsAgendaPage() {
   const { token, user } = useAuth();
   const [date, setDate] = useState(getClinicToday());
   const [dentistFilter, setDentistFilter] = useState<number | "">("");
+  const [statusFilter, setStatusFilter] = useState<AppointmentStatus | "">("");
+  const [patientSearch, setPatientSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [dentists, setDentists] = useState<Dentist[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [reschedulingAppointment, setReschedulingAppointment] = useState<Appointment | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
@@ -47,34 +52,68 @@ export function AppointmentsAgendaPage() {
   function load() {
     if (!token) return;
     setIsLoading(true);
-    listAppointments(token, { date, dentistId: dentistFilter || undefined })
+    setError(null);
+    listAppointments(token, {
+      date,
+      dentistId: dentistFilter || undefined,
+      status: statusFilter || undefined,
+      search: appliedSearch || undefined,
+    })
       .then(setAppointments)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load appointments."))
       .finally(() => setIsLoading(false));
   }
 
-  useEffect(load, [token, date, dentistFilter]);
+  useEffect(load, [token, date, dentistFilter, statusFilter, appliedSearch]);
+
+  function handleSearch(e: FormEvent) {
+    e.preventDefault();
+    setAppliedSearch(patientSearch.trim());
+  }
+
+  function resetFilters() {
+    setDate(getClinicToday());
+    setDentistFilter("");
+    setStatusFilter("");
+    setPatientSearch("");
+    setAppliedSearch("");
+  }
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timeoutId = window.setTimeout(() => setSuccessMessage(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [successMessage]);
 
   async function handleConfirm(id: number) {
     if (!token) return;
     setError(null);
+    setSuccessMessage(null);
+    setUpdatingId(id);
     try {
       await confirmAppointment(token, id);
+      setSuccessMessage("Appointment confirmed.");
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to confirm appointment.");
+    } finally {
+      setUpdatingId(null);
     }
   }
 
   async function handleCancel(id: number) {
     if (!token) return;
     setError(null);
+    setSuccessMessage(null);
+    setUpdatingId(id);
     try {
       await cancelAppointment(token, id);
+      setSuccessMessage("Appointment cancelled.");
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to cancel appointment.");
     } finally {
+      setUpdatingId(null);
       setCancellingId(null);
     }
   }
@@ -82,11 +121,11 @@ export function AppointmentsAgendaPage() {
   return (
     <AppShell pageTitle="Appointments">
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <div className="d-flex flex-wrap align-items-center gap-2">
+        <div className="appointment-toolbar-group d-flex flex-wrap align-items-center gap-2">
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setDate(shiftDate(date, -1))}>
             ← Prev
           </button>
-          <input type="date" className="form-control" style={{ maxWidth: 170 }} value={date} onChange={(e) => setDate(e.target.value)} />
+          <input type="date" className="form-control" style={{ maxWidth: 170 }} value={date} onChange={(e) => setDate(e.target.value)} aria-label="Appointment date" />
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setDate(shiftDate(date, 1))}>
             Next →
           </button>
@@ -95,7 +134,19 @@ export function AppointmentsAgendaPage() {
           </button>
         </div>
 
-        <div className="d-flex align-items-center gap-2">
+        <div className="appointment-toolbar-group d-flex flex-wrap align-items-center gap-2">
+          <form className="d-flex gap-2" role="search" onSubmit={handleSearch}>
+            <input
+              type="search"
+              className="form-control"
+              style={{ maxWidth: 220 }}
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+              placeholder="Search patient"
+              aria-label="Search patients by name, email, or phone"
+            />
+            <button type="submit" className="btn btn-outline-secondary">Search</button>
+          </form>
           <select
             className="form-select"
             style={{ maxWidth: 220 }}
@@ -110,6 +161,24 @@ export function AppointmentsAgendaPage() {
               </option>
             ))}
           </select>
+          <select
+            className="form-select"
+            style={{ maxWidth: 180 }}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as AppointmentStatus | "")}
+            aria-label="Filter by appointment status"
+          >
+            <option value="">All Statuses</option>
+            <option value="BOOKED">Booked</option>
+            <option value="CONFIRMED">Confirmed</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+          {(dentistFilter || statusFilter || appliedSearch || date !== getClinicToday()) && (
+            <button type="button" className="btn btn-link btn-sm" onClick={resetFilters}>
+              Reset Filters
+            </button>
+          )}
           <button type="button" className="btn btn-primary" onClick={() => setShowNewModal(true)}>
             + New Appointment
           </button>
@@ -119,6 +188,12 @@ export function AppointmentsAgendaPage() {
       {error && (
         <div className="alert alert-danger py-2" role="alert">
           {error}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="alert alert-success py-2" role="status">
+          {successMessage}
         </div>
       )}
 
@@ -154,8 +229,8 @@ export function AppointmentsAgendaPage() {
                     </button>
                   )}
                   {a.status === "BOOKED" && (
-                    <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => handleConfirm(a.id)}>
-                      Confirm
+                    <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => handleConfirm(a.id)} disabled={updatingId === a.id}>
+                      {updatingId === a.id ? "Updating..." : "Confirm"}
                     </button>
                   )}
                   {(a.status === "BOOKED" || a.status === "CONFIRMED") && (
@@ -187,6 +262,7 @@ export function AppointmentsAgendaPage() {
               onCancel={() => setShowNewModal(false)}
               onBooked={() => {
                 setShowNewModal(false);
+                setSuccessMessage("Appointment created.");
                 load();
               }}
             />
@@ -201,6 +277,7 @@ export function AppointmentsAgendaPage() {
           onClose={() => setReschedulingAppointment(null)}
           onSaved={() => {
             setReschedulingAppointment(null);
+            setSuccessMessage("Appointment rescheduled.");
             load();
           }}
         />
@@ -213,8 +290,8 @@ export function AppointmentsAgendaPage() {
             <button type="button" className="btn btn-outline-secondary" onClick={() => setCancellingId(null)}>
               Keep Appointment
             </button>
-            <button type="button" className="btn btn-danger" onClick={() => handleCancel(cancellingId)}>
-              Yes, Cancel It
+            <button type="button" className="btn btn-danger" onClick={() => handleCancel(cancellingId)} disabled={updatingId === cancellingId}>
+              {updatingId === cancellingId ? "Cancelling..." : "Yes, Cancel It"}
             </button>
           </div>
         </ModalShell>
@@ -263,7 +340,7 @@ function AdminTreatmentNoteModal({ appointment, onClose }: { appointment: Appoin
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
-    <div className="modal d-block" tabIndex={-1} role="dialog" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
+    <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
       <div className="modal-dialog" role="document" onClick={(e) => e.stopPropagation()}>
         <div className="modal-content">
           <div className="modal-header">

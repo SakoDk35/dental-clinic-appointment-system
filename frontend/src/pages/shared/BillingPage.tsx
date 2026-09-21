@@ -11,14 +11,17 @@ export function BillingPage() {
   const { token, user } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [summary, setSummary] = useState<BillingSummary | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"" | "UNPAID" | "PAID">("");
+  const [statusFilter, setStatusFilter] = useState<"" | "UNPAID" | "PAID" | "VOID">("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   function load() {
     if (!token) return;
     setIsLoading(true);
+    setError(null);
     listPayments(token, { status: statusFilter || undefined })
       .then(setPayments)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load payments."))
@@ -32,15 +35,25 @@ export function BillingPage() {
 
   useEffect(load, [token, statusFilter]);
 
+  useEffect(() => {
+    if (!successMessage) return;
+    const timeoutId = window.setTimeout(() => setSuccessMessage(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [successMessage]);
+
   async function handleMarkPaid(id: number) {
     if (!token) return;
     setError(null);
+    setSuccessMessage(null);
+    setIsUpdating(true);
     try {
       await markPaymentPaid(token, id);
+      setSuccessMessage("Payment marked as paid.");
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update payment.");
     } finally {
+      setIsUpdating(false);
       setConfirmingId(null);
     }
   }
@@ -71,12 +84,13 @@ export function BillingPage() {
           className="form-select"
           style={{ maxWidth: 200 }}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as "" | "UNPAID" | "PAID")}
+          onChange={(e) => setStatusFilter(e.target.value as "" | "UNPAID" | "PAID" | "VOID")}
           aria-label="Filter by payment status"
         >
           <option value="">All</option>
           <option value="UNPAID">Unpaid</option>
           <option value="PAID">Paid</option>
+          <option value="VOID">Void</option>
         </select>
       </div>
 
@@ -85,6 +99,8 @@ export function BillingPage() {
           {error}
         </div>
       )}
+
+      {successMessage && <div className="alert alert-success py-2" role="status">{successMessage}</div>}
 
       <div className="card">
         {isLoading ? (
@@ -115,7 +131,7 @@ export function BillingPage() {
                       <StatusBadge status={p.status} />
                     </td>
                     <td className="text-end">
-                      {p.status === "UNPAID" && (
+                      {p.status === "UNPAID" && p.appointmentStatus === "COMPLETED" && (
                         <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setConfirmingId(p.id)}>
                           Mark as Paid
                         </button>
@@ -134,6 +150,7 @@ export function BillingPage() {
           className="modal d-block"
           tabIndex={-1}
           role="dialog"
+          aria-modal="true"
           style={{ backgroundColor: "rgba(15,23,42,0.4)" }}
           onClick={() => setConfirmingId(null)}
         >
@@ -150,8 +167,8 @@ export function BillingPage() {
                 <button type="button" className="btn btn-outline-secondary" onClick={() => setConfirmingId(null)}>
                   Cancel
                 </button>
-                <button type="button" className="btn btn-primary" onClick={() => handleMarkPaid(confirmingPayment.id)}>
-                  Confirm
+                <button type="button" className="btn btn-primary" onClick={() => handleMarkPaid(confirmingPayment.id)} disabled={isUpdating}>
+                  {isUpdating ? "Updating..." : "Confirm"}
                 </button>
               </div>
             </div>

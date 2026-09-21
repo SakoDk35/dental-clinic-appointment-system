@@ -6,6 +6,7 @@
 
 import type { Request, Response, NextFunction } from "express";
 import { verifyToken, type JwtPayload } from "../utils/jwt";
+import { prisma } from "../lib/prisma";
 
 // Lets every route handler read req.user with proper typing, without
 // needing to redeclare this everywhere it's used.
@@ -18,7 +19,7 @@ declare global {
   }
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction) {
+export async function authenticate(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
 
   if (!header || !header.startsWith("Bearer ")) {
@@ -27,12 +28,31 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
 
   const token = header.slice("Bearer ".length);
 
+  let payload: JwtPayload;
   try {
-    req.user = verifyToken(token);
-    next();
+    payload = verifyToken(token);
   } catch {
     return res
       .status(401)
       .json({ success: false, message: "Invalid or expired session. Please log in again." });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, role: true, isActive: true },
+    });
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "This account is no longer active. Please contact an administrator.",
+      });
+    }
+
+    req.user = { userId: user.id, role: user.role };
+    next();
+  } catch (error) {
+    next(error);
   }
 }

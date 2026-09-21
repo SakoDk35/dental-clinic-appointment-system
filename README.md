@@ -29,10 +29,10 @@ dental-clinic-project/
 cd server
 npm install
 cp .env.example .env
-# edit .env: set DATABASE_URL to your local PostgreSQL connection string,
-# and set JWT_SECRET to any long random string
+# edit .env: set DATABASE_URL, a JWT_SECRET of at least 32 characters,
+# and FRONTEND_URL=http://localhost:5173
 
-npx prisma migrate dev --name init
+npx prisma migrate dev
 npm run prisma:seed
 npm run dev
 ```
@@ -68,7 +68,9 @@ All demo accounts created by `npm run prisma:seed` share the password
 | Dentist (2nd) | dentist2@clinic.com |
 | Patient | patient@clinic.com |
 
-New patients can also self-register from the Login page.
+New patients can also self-register from the Login page. The seed creates the
+accounts, dentist profiles, weekly working hours, and services listed above; it
+does not create sample appointments or payments.
 
 ## Roles & Permissions
 
@@ -81,14 +83,48 @@ New patients can also self-register from the Login page.
 
 - A dentist can never have two overlapping appointments. This is owned by
   `assertSlotIsFree()` in `appointments.service.ts`, which checks real interval
-  overlap and ignores cancelled appointments. (A database unique constraint was
-  deliberately removed: it could only catch identical start times, and it
-  wrongly blocked re-booking a slot whose appointment had been cancelled.)
+  overlap and ignores cancelled appointments. PostgreSQL also enforces the rule
+  under concurrent requests with a GiST exclusion constraint over dentist,
+  appointment date, and the half-open `[start, end)` time range. A plain unique
+  start-time constraint would not catch 30/60-minute overlaps and would wrongly
+  block re-booking cancelled slots.
 - Appointments cannot be booked or rescheduled into the past.
 - Appointment times must fall within the dentist's weekly working hours.
+- Future appointments cannot be marked completed.
 - Treatment notes are visible only to the writing dentist and Admin — never Receptionist or Patient.
+- Treatment notes can only be written or edited after the appointment is completed.
+- Cancelling an unpaid appointment voids its payment. Only completed appointments
+  can be marked paid; void payments never contribute to revenue or unpaid debt.
 - Passwords are always hashed; `passwordHash` is never returned by any API response.
 - Every route enforces its own role check server-side — the frontend's route guards are a UX convenience only.
+
+## Environment Variables
+
+Backend (`server/.env`):
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/dental_clinic?schema=public"
+PORT=4000
+JWT_SECRET="replace-with-a-random-secret-of-at-least-32-characters"
+FRONTEND_URL="http://localhost:5173"
+```
+
+`FRONTEND_URL` accepts a comma-separated list when more than one browser origin
+is needed. The frontend uses `VITE_API_URL`, as shown in `frontend/.env.example`.
+Never commit real credentials or secrets.
+
+## Security Basics
+
+- JWTs expire after eight hours. The API also checks the current database user
+  on every authenticated request, so deleted or deactivated accounts are rejected
+  and authorization uses the user's current role.
+- The server refuses to start with a missing or short `JWT_SECRET`.
+- CORS is limited to the configured frontend origin(s).
+- Login is limited to 20 failed attempts per 15 minutes per client; successful
+  logins do not consume that allowance. Registration is limited to 10 attempts
+  per hour.
+- An Admin cannot deactivate their own account or leave the system without an
+  active Admin.
 
 ## API
 
@@ -117,17 +153,35 @@ If you already ran an earlier migration that included the
 that constraint has been replaced with a plain index (see "Core Business Rules"
 above for why).
 
+The later migrations add the PostgreSQL exclusion constraint and the `VOID`
+payment status. Run migrations forward; do not reset an existing database:
+
+```bash
+cd server
+npx prisma migrate deploy
+```
+
+## Automated API Tests
+
+The focused integration suite covers authentication/RBAC, overlap and concurrent
+booking protection, working hours, cancelled-slot rebooking, lifecycle rules,
+treatment-note privacy, billing, strict payment dates, timezone behavior, and API
+404 responses.
+
+Tests deliberately require a separate PostgreSQL database whose name contains
+`test`. They never fall back to the development `DATABASE_URL`:
+
+```bash
+# Create and migrate a separate database first, for example dental_clinic_test.
+# Set TEST_DATABASE_URL in your shell, then:
+cd server
+npm test
+```
+
+The suite clears only its isolated test database before and after execution.
+
 ## Known Limitations
 
-- TypeScript compilation of the backend has not been run in the environment
-  this was built in (no network access for `npm install`). Run `npm run build`
-  (or `npx tsc --noEmit`) in `server/` after installing dependencies to catch
-  anything that needs a small fix.
-- `frontend/src/api/mockData.ts` and `frontend/src/pages/PlaceholderPage.tsx`
-  are no longer used by any page (every screen now calls the real backend)
-  but were left in place rather than deleted, in keeping with "don't remove
-  working code unnecessarily." Safe to delete once you've confirmed you don't
-  need them for reference.
 - The Appointments screen uses a single agenda/list layout at every screen
   size (rather than a separate desktop grid + mobile list) — this was a
   deliberate simplification: it satisfies the approved "simplified list view

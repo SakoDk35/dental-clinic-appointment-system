@@ -10,6 +10,7 @@ const STATUS_LABEL: Record<Status, string> = {
   CANCELLED: "Cancelled",
   UNPAID: "Unpaid",
   PAID: "Paid",
+  VOID: "Void",
 };
 
 // Maps each status to the CSS class defined in theme.css, so color
@@ -21,6 +22,7 @@ const STATUS_CLASS: Record<Status, string> = {
   CANCELLED: "badge-status-cancelled",
   UNPAID: "badge-status-unpaid",
   PAID: "badge-status-paid",
+  VOID: "badge-status-void",
 };
 
 export function StatusBadge({ status }: { status: Status }) {

@@ -11,24 +11,28 @@ export function DentistDashboard() {
   const { token } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
     // No dentistId needed — the backend resolves "my own appointments"
     // from the JWT for a DENTIST role automatically.
     const today = getClinicToday();
-    listAppointments(token, { date: today }).then((data) => {
-      setAppointments(data);
-      setIsLoading(false);
-    });
+    setError(null);
+    listAppointments(token, { date: today })
+      .then(setAppointments)
+      .catch(() => setError("Unable to load today's schedule. Please try again."))
+      .finally(() => setIsLoading(false));
   }, [token]);
 
   return (
     <AppShell pageTitle="Dashboard">
       <h2 className="h2 mb-3">Today's Schedule</h2>
 
-      {isLoading ? (
-        <p className="text-helper">Loading...</p>
+      {error && <div className="alert alert-danger" role="alert">{error}</div>}
+
+      {error ? null : isLoading ? (
+        <p className="text-helper">Loading today&apos;s schedule...</p>
       ) : appointments.length === 0 ? (
         <div className="card p-4 text-center">
           <p className="text-helper mb-0">No appointments scheduled for today.</p>

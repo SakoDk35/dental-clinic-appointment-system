@@ -5,6 +5,7 @@ import { AppError } from "../../middleware/errorHandler";
 import {
   validateDentistInput,
   validateDentistUpdateInput,
+  validateDentistTimeOffInput,
   validateWorkingHoursInput,
 } from "./dentists.validation";
 import {
@@ -14,6 +15,9 @@ import {
   updateDentist,
   setDentistActive,
   setWorkingHours,
+  listDentistTimeOff,
+  createDentistTimeOff,
+  deleteDentistTimeOff,
 } from "./dentists.service";
 
 function parseId(idParam: string): number {
@@ -99,6 +103,34 @@ export async function updateWorkingHours(req: Request, res: Response, next: Next
 
     const dentist = await setWorkingHours(id, rows);
     res.status(200).json({ success: true, data: dentist });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function listTimeOff(req: Request, res: Response, next: NextFunction) {
+  try {
+    const rows = await listDentistTimeOff(parseId(req.params.id));
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createTimeOff(req: Request, res: Response, next: NextFunction) {
+  try {
+    const input = validateDentistTimeOffInput(req.body ?? {});
+    const row = await createDentistTimeOff(parseId(req.params.id), input);
+    res.status(201).json({ success: true, data: row });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function removeTimeOff(req: Request, res: Response, next: NextFunction) {
+  try {
+    await deleteDentistTimeOff(parseId(req.params.id), parseId(req.params.timeOffId));
+    res.status(200).json({ success: true, data: null });
   } catch (err) {
     next(err);
   }

@@ -22,6 +22,7 @@ export function PatientsListPage() {
   function load(searchTerm?: string) {
     if (!token) return;
     setIsLoading(true);
+    setError(null);
     listPatients(token, searchTerm)
       .then(setPatients)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load patients."))
@@ -161,6 +162,7 @@ function CreatePatientModal({
       className="modal d-block"
       tabIndex={-1}
       role="dialog"
+      aria-modal="true"
       style={{ backgroundColor: "rgba(15,23,42,0.4)" }}
       onClick={onClose}
     >

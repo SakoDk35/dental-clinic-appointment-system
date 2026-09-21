@@ -8,9 +8,9 @@
 
 :root {
   /* Brand */
-  --color-primary: #0f766e;
-  --color-primary-dark: #0b5952;
-  --color-secondary: #38bdf8;
+  --color-primary: #0875c9;
+  --color-primary-dark: #0568b5;
+  --color-secondary: #249ee6;
 
   /* Status */
   --color-success: #16a34a;
@@ -18,23 +18,23 @@
   --color-danger: #dc2626;
 
   /* Neutrals */
-  --color-bg: #f8fafc;
+  --color-bg: #f3f7fb;
   --color-surface: #ffffff;
-  --color-border: #e2e8f0;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #64748b;
+  --color-border: #d8e1ec;
+  --color-text-primary: #0f2340;
+  --color-text-secondary: #708096;
   --color-disabled: #cbd5e1;
 
   --font-family-base: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
 
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --radius-md: 14px;
+  --shadow-card: 0 8px 24px rgba(15, 42, 78, 0.06);
 
   /* Bootstrap variable overrides so built-in components (buttons, alerts,
      badges) pick up our palette without us rewriting them from scratch. */
   --bs-primary: var(--color-primary);
-  --bs-primary-rgb: 15, 118, 110;
+  --bs-primary-rgb: 8, 117, 201;
   --bs-body-font-family: var(--font-family-base);
   --bs-body-color: var(--color-text-primary);
   --bs-body-bg: var(--color-bg);
@@ -52,7 +52,7 @@ h2, .h2 { font-weight: 600; font-size: 20px; }
 h3, .h3 { font-weight: 600; font-size: 16px; }
 small, .text-helper { font-size: 12px; color: var(--color-text-secondary); }
 
-/* Primary button: solid teal, matches spec's "Primary (Brand)" role */
+/* Primary button: Login-matched blue, used consistently across the app. */
 .btn-primary {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
@@ -69,7 +69,7 @@ small, .text-helper { font-size: 12px; color: var(--color-text-secondary); }
   border-color: var(--color-disabled);
 }
 
-/* Secondary button: white bg, teal border/text */
+/* Secondary button: white background with the same blue brand accent. */
 .btn-outline-primary {
   color: var(--color-primary);
   border-color: var(--color-primary);
@@ -97,12 +97,13 @@ small, .text-helper { font-size: 12px; color: var(--color-text-secondary); }
   font-size: 12px;
   font-weight: 500;
 }
-.badge-status-booked { background-color: rgba(217, 119, 6, 0.12); color: var(--color-warning); }
-.badge-status-confirmed { background-color: rgba(15, 118, 110, 0.12); color: var(--color-primary); }
+.badge-status-booked { background-color: rgba(8, 117, 201, 0.11); color: #0869b5; }
+.badge-status-confirmed { background-color: rgba(13, 148, 136, 0.12); color: #0f766e; }
 .badge-status-completed { background-color: rgba(22, 163, 74, 0.12); color: var(--color-success); }
 .badge-status-cancelled { background-color: rgba(220, 38, 38, 0.12); color: var(--color-danger); }
 .badge-status-unpaid { background-color: rgba(217, 119, 6, 0.12); color: var(--color-warning); }
 .badge-status-paid { background-color: rgba(22, 163, 74, 0.12); color: var(--color-success); }
+.badge-status-void { background-color: rgba(100, 116, 139, 0.14); color: #475569; }
 
 /* Visible keyboard focus ring everywhere — accessibility requirement,
    not just the default (often too faint) browser outline. */

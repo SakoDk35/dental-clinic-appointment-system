@@ -16,6 +16,7 @@ function toPaymentDto(payment: PaymentWithRelations) {
   return {
     id: payment.id,
     appointmentId: payment.appointmentId,
+    appointmentStatus: payment.appointment.status,
     patientName: payment.appointment.patient.fullName,
     serviceName: payment.appointment.service.name,
     date: payment.appointment.appointmentDate.toISOString().slice(0, 10),
@@ -28,7 +29,7 @@ function toPaymentDto(payment: PaymentWithRelations) {
 interface ListPaymentsFilters {
   from?: string;
   to?: string;
-  status?: "UNPAID" | "PAID";
+  status?: "UNPAID" | "PAID" | "VOID";
 }
 
 export async function listPayments(filters: ListPaymentsFilters) {
@@ -62,12 +63,21 @@ export async function getPaymentById(id: number) {
 }
 
 export async function markPaymentPaid(id: number) {
-  const existing = await prisma.payment.findUnique({ where: { id } });
+  const existing = await prisma.payment.findUnique({
+    where: { id },
+    include: { appointment: true },
+  });
   if (!existing) {
     throw new AppError(404, "Payment not found.");
   }
   if (existing.status === "PAID") {
     throw new AppError(409, "This payment has already been marked as paid.");
+  }
+  if (existing.status === "VOID" || existing.appointment.status === "CANCELLED") {
+    throw new AppError(409, "A void or cancelled appointment cannot be paid.");
+  }
+  if (existing.appointment.status !== "COMPLETED") {
+    throw new AppError(409, "Payment can only be recorded after the appointment is completed.");
   }
 
   const updated = await prisma.payment.update({

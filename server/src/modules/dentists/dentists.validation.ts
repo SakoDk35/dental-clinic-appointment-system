@@ -2,6 +2,8 @@
 
 import { AppError } from "../../middleware/errorHandler";
 import { VALIDATION_LIMITS } from "../../utils/validationLimits";
+import { getClinicDateTimeParts } from "../../utils/clinicTime";
+import { isValidCalendarDate } from "../appointments/appointments.validation";
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/; // "HH:mm", 24-hour
@@ -119,4 +121,40 @@ export function validateWorkingHoursInput(rows: unknown): WorkingHoursInputRow[]
   }
 
   return rows as WorkingHoursInputRow[];
+}
+
+export interface DentistTimeOffInput {
+  date: string;
+  startTime: string | null;
+  endTime: string | null;
+}
+
+export function validateDentistTimeOffInput(input: {
+  date?: unknown;
+  fullDay?: unknown;
+  startTime?: unknown;
+  endTime?: unknown;
+}): DentistTimeOffInput {
+  if (typeof input.date !== "string" || !isValidCalendarDate(input.date)) {
+    throw new AppError(400, "date must be a valid date in YYYY-MM-DD format.");
+  }
+  if (input.date < getClinicDateTimeParts().date) {
+    throw new AppError(400, "Time-off cannot be created in the past.");
+  }
+  if (typeof input.fullDay !== "boolean") {
+    throw new AppError(400, "fullDay must be true or false.");
+  }
+  if (input.fullDay) {
+    return { date: input.date, startTime: null, endTime: null };
+  }
+  if (typeof input.startTime !== "string" || !TIME_REGEX.test(input.startTime)) {
+    throw new AppError(400, "startTime must be in HH:mm format.");
+  }
+  if (typeof input.endTime !== "string" || !TIME_REGEX.test(input.endTime)) {
+    throw new AppError(400, "endTime must be in HH:mm format.");
+  }
+  if (input.startTime >= input.endTime) {
+    throw new AppError(400, "startTime must be before endTime.");
+  }
+  return { date: input.date, startTime: input.startTime, endTime: input.endTime };
 }

@@ -13,6 +13,7 @@ import {
   getUserById,
   createStaffUser,
   setUserActive,
+  deactivateUserSafely,
   adminResetPassword,
 } from "./users.service";
 
@@ -128,7 +129,7 @@ export async function activate(req: Request, res: Response, next: NextFunction) 
 export async function deactivate(req: Request, res: Response, next: NextFunction) {
   try {
     const id = parseId(req.params.id);
-    const user = await setUserActive(id, false);
+    const user = await deactivateUserSafely(id, req.user!.userId);
     res.status(200).json({ success: true, data: user });
   } catch (err) {
     next(err);

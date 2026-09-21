@@ -11,6 +11,9 @@ import {
   activate,
   deactivate,
   updateWorkingHours,
+  listTimeOff,
+  createTimeOff,
+  removeTimeOff,
 } from "./dentists.controller";
 
 export const dentistsRoutes = Router();
@@ -27,3 +30,6 @@ dentistsRoutes.patch("/:id", authenticate, adminOnly, update);
 dentistsRoutes.patch("/:id/activate", authenticate, adminOnly, activate);
 dentistsRoutes.patch("/:id/deactivate", authenticate, adminOnly, deactivate);
 dentistsRoutes.put("/:id/working-hours", authenticate, adminOnly, updateWorkingHours);
+dentistsRoutes.get("/:id/time-off", authenticate, adminOnly, listTimeOff);
+dentistsRoutes.post("/:id/time-off", authenticate, adminOnly, createTimeOff);
+dentistsRoutes.delete("/:id/time-off/:timeOffId", authenticate, adminOnly, removeTimeOff);

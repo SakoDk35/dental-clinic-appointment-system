@@ -11,9 +11,13 @@ import {
   activateDentist,
   deactivateDentist,
   setWorkingHours,
+  listDentistTimeOff,
+  createDentistTimeOff,
+  deleteDentistTimeOff,
 } from "../../api/dentistsApi";
-import type { Dentist, WorkingHours } from "../../types";
+import type { Dentist, DentistTimeOff, WorkingHours } from "../../types";
 import { VALIDATION_LIMITS } from "../../utils/validationLimits";
+import { getClinicToday } from "../../utils/clinicTime";
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -25,10 +29,14 @@ export function ManageDentistsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingDentist, setEditingDentist] = useState<Dentist | null>(null);
   const [hoursDentist, setHoursDentist] = useState<Dentist | null>(null);
+  const [timeOffDentist, setTimeOffDentist] = useState<Dentist | null>(null);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   function load() {
     if (!token) return;
     setIsLoading(true);
+    setError(null);
     listDentists(token)
       .then(setDentists)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load dentists."))
@@ -36,6 +44,12 @@ export function ManageDentistsPage() {
   }
 
   useEffect(load, [token]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timeoutId = window.setTimeout(() => setSuccessMessage(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [successMessage]);
 
   return (
     <AppShell pageTitle="Dentists">
@@ -50,6 +64,8 @@ export function ManageDentistsPage() {
           {error}
         </div>
       )}
+
+      {successMessage && <div className="alert alert-success py-2" role="status">{successMessage}</div>}
 
       <div className="card">
         {isLoading ? (
@@ -87,20 +103,30 @@ export function ManageDentistsPage() {
                         <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setHoursDentist(d)}>
                           Working Hours
                         </button>
+                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setTimeOffDentist(d)}>
+                          Time Off
+                        </button>
                         <button
                           type="button"
                           className={`btn btn-sm ${d.isActive ? "btn-outline-danger" : "btn-outline-success"}`}
+                          disabled={updatingId === d.id}
                           onClick={async () => {
                             if (!token) return;
+                            if (d.isActive && !window.confirm(`Deactivate ${d.fullName}? They will no longer be available for new bookings.`)) return;
+                            setError(null);
+                            setUpdatingId(d.id);
                             try {
                               d.isActive ? await deactivateDentist(token, d.id) : await activateDentist(token, d.id);
+                              setSuccessMessage(d.isActive ? "Dentist deactivated." : "Dentist activated.");
                               load();
                             } catch (err) {
                               setError(err instanceof Error ? err.message : "Failed to update dentist.");
+                            } finally {
+                              setUpdatingId(null);
                             }
                           }}
                         >
-                          {d.isActive ? "Deactivate" : "Activate"}
+                          {updatingId === d.id ? "Updating..." : d.isActive ? "Deactivate" : "Activate"}
                         </button>
                       </div>
                     </td>
@@ -113,20 +139,27 @@ export function ManageDentistsPage() {
       </div>
 
       {showCreateModal && (
-        <CreateDentistModal onClose={() => setShowCreateModal(false)} onCreated={() => { setShowCreateModal(false); load(); }} />
+        <CreateDentistModal onClose={() => setShowCreateModal(false)} onCreated={() => { setShowCreateModal(false); setSuccessMessage("Dentist created."); load(); }} />
       )}
       {editingDentist && (
         <EditDentistModal
           dentist={editingDentist}
           onClose={() => setEditingDentist(null)}
-          onSaved={() => { setEditingDentist(null); load(); }}
+          onSaved={() => { setEditingDentist(null); setSuccessMessage("Dentist updated."); load(); }}
         />
       )}
       {hoursDentist && (
         <WorkingHoursModal
           dentist={hoursDentist}
           onClose={() => setHoursDentist(null)}
-          onSaved={() => { setHoursDentist(null); load(); }}
+          onSaved={() => { setHoursDentist(null); setSuccessMessage("Working hours updated."); load(); }}
+        />
+      )}
+      {timeOffDentist && (
+        <TimeOffModal
+          dentist={timeOffDentist}
+          onClose={() => setTimeOffDentist(null)}
+          onChanged={(message) => setSuccessMessage(message)}
         />
       )}
     </AppShell>
@@ -265,8 +298,8 @@ function WorkingHoursModal({ dentist, onClose, onSaved }: { dentist: Dentist; on
         <div className="modal-body">
           {error && <div className="alert alert-danger py-2">{error}</div>}
           {DAY_LABELS.map((label, day) => (
-            <div key={day} className="d-flex align-items-center gap-2 mb-2">
-              <div className="form-check" style={{ width: 140 }}>
+            <div key={day} className="working-hours-row d-flex align-items-center gap-2 mb-2">
+              <div className="form-check working-hours-day">
                 <input
                   className="form-check-input"
                   type="checkbox"
@@ -307,9 +340,135 @@ function WorkingHoursModal({ dentist, onClose, onSaved }: { dentist: Dentist; on
   );
 }
 
+function TimeOffModal({
+  dentist,
+  onClose,
+  onChanged,
+}: {
+  dentist: Dentist;
+  onClose: () => void;
+  onChanged: (message: string) => void;
+}) {
+  const { token } = useAuth();
+  const [rows, setRows] = useState<DentistTimeOff[]>([]);
+  const [date, setDate] = useState(getClinicToday());
+  const [fullDay, setFullDay] = useState(true);
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("12:00");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function load() {
+    if (!token) return;
+    setIsLoading(true);
+    listDentistTimeOff(token, dentist.id)
+      .then(setRows)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load time-off."))
+      .finally(() => setIsLoading(false));
+  }
+
+  useEffect(load, [token, dentist.id]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!token) return;
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await createDentistTimeOff(token, dentist.id, {
+        date,
+        fullDay,
+        ...(fullDay ? {} : { startTime, endTime }),
+      });
+      onChanged("Time-off period added.");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add time-off.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!token) return;
+    setError(null);
+    setDeletingId(id);
+    try {
+      await deleteDentistTimeOff(token, dentist.id, id);
+      onChanged("Time-off period removed.");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove time-off.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <ModalShell title={`Time Off — ${dentist.fullName}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="modal-body">
+          {error && <div className="alert alert-danger py-2" role="alert">{error}</div>}
+          <div className="row g-2 align-items-end">
+            <div className="col-12 col-sm-5">
+              <label className="form-label fw-medium" htmlFor="timeOffDate">Date</label>
+              <input id="timeOffDate" type="date" className="form-control" min={getClinicToday()} value={date} onChange={(e) => setDate(e.target.value)} required />
+            </div>
+            <div className="col-12 col-sm-7">
+              <div className="form-check mb-2">
+                <input id="timeOffFullDay" type="checkbox" className="form-check-input" checked={fullDay} onChange={(e) => setFullDay(e.target.checked)} />
+                <label className="form-check-label" htmlFor="timeOffFullDay">Full day</label>
+              </div>
+            </div>
+            {!fullDay && (
+              <>
+                <div className="col-6">
+                  <label className="form-label fw-medium" htmlFor="timeOffStart">From</label>
+                  <input id="timeOffStart" type="time" className="form-control" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
+                </div>
+                <div className="col-6">
+                  <label className="form-label fw-medium" htmlFor="timeOffEnd">To</label>
+                  <input id="timeOffEnd" type="time" className="form-control" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
+                </div>
+              </>
+            )}
+          </div>
+          <button type="submit" className="btn btn-primary mt-3" disabled={isSubmitting}>
+            {isSubmitting ? "Adding..." : "Add Time Off"}
+          </button>
+
+          <hr />
+          <h3 className="h6">Scheduled Time Off</h3>
+          {isLoading ? (
+            <p className="text-helper mb-0">Loading...</p>
+          ) : rows.length === 0 ? (
+            <p className="text-helper mb-0">No time-off periods scheduled.</p>
+          ) : (
+            <div className="d-flex flex-column gap-2">
+              {rows.map((row) => (
+                <div key={row.id} className="border rounded p-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                  <span>{row.date} · {row.fullDay ? "Full day" : `${row.startTime}–${row.endTime}`}</span>
+                  <button type="button" className="btn btn-sm btn-outline-danger" disabled={deletingId === row.id} onClick={() => handleDelete(row.id)}>
+                    {deletingId === row.id ? "Removing..." : "Remove"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn-outline-secondary" onClick={onClose}>Close</button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
-    <div className="modal d-block" tabIndex={-1} role="dialog" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
+    <div className="modal d-block" tabIndex={-1} role="dialog" aria-modal="true" style={{ backgroundColor: "rgba(15,23,42,0.4)" }} onClick={onClose}>
       <div className="modal-dialog" role="document" onClick={(e) => e.stopPropagation()}>
         <div className="modal-content">
           <div className="modal-header">

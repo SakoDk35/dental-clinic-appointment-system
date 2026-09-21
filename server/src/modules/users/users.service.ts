@@ -139,6 +139,45 @@ export async function setUserActive(id: number, isActive: boolean) {
   return toSafeUser(updated);
 }
 
+export async function deactivateUserSafely(id: number, requesterId: number) {
+  if (id === requesterId) {
+    throw new AppError(409, "You cannot deactivate your own account.");
+  }
+
+  // Serializable isolation keeps concurrent Admin deactivations from
+  // accidentally removing the final active Admin account.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const existing = await tx.user.findUnique({ where: { id } });
+          if (!existing) {
+            throw new AppError(404, "User not found.");
+          }
+
+          if (existing.role === "ADMIN" && existing.isActive) {
+            const activeAdminCount = await tx.user.count({
+              where: { role: "ADMIN", isActive: true },
+            });
+            if (activeAdminCount <= 1) {
+              throw new AppError(409, "At least one active Admin account must remain.");
+            }
+          }
+
+          const updated = await tx.user.update({ where: { id }, data: { isActive: false } });
+          return toSafeUser(updated);
+        },
+        { isolationLevel: "Serializable" }
+      );
+    } catch (error) {
+      if (error instanceof AppError || attempt === 2) throw error;
+      if (!(error instanceof Error) || !error.message.includes("P2034")) throw error;
+    }
+  }
+
+  throw new AppError(409, "The account could not be deactivated. Please try again.");
+}
+
 // Admin resetting someone else's password — no "current password" check,
 // since the whole point is the user can no longer log in to prove it.
 export async function adminResetPassword(id: number, newPassword: string) {
