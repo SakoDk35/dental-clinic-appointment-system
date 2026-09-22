@@ -10,13 +10,56 @@
 .app-shell-content {
   min-width: 0;
   flex: 1 1 auto;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-main {
   width: 100%;
   max-width: 1440px;
+  flex: 1 0 auto;
   margin-inline: auto;
   padding: 30px clamp(18px, 2.5vw, 36px) 46px;
+}
+
+.app-footer {
+  border-top: 1px solid #dce7f1;
+  background: rgba(255, 255, 255, 0.82);
+  color: #62758d;
+  font-size: 12px;
+}
+
+.app-footer-inner {
+  width: 100%;
+  max-width: 1440px;
+  min-height: 68px;
+  margin-inline: auto;
+  padding: 16px clamp(18px, 2.5vw, 36px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+}
+
+.app-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+}
+
+.app-footer a {
+  color: #365373;
+  text-decoration: none;
+}
+
+.app-footer a:hover,
+.app-footer a:focus-visible {
+  color: #0875c9;
+  text-decoration: underline;
 }
 
 .app-sidebar {
@@ -502,6 +545,10 @@
 
   .app-main {
     padding: 20px 16px 36px;
+  }
+
+  .app-footer-inner {
+    padding-inline: 16px;
   }
 
   .dashboard-intro {

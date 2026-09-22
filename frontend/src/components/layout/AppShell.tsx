@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { useAuth } from "../../hooks/useAuth";
@@ -39,6 +40,17 @@ export function AppShell({ pageTitle, children }: AppShellProps) {
         />
 
         <main className="app-main">{children}</main>
+
+        <footer className="app-footer">
+          <div className="app-footer-inner">
+            <nav className="app-footer-links" aria-label="Footer">
+              <Link to="/terms">Terms of Service</Link>
+              <Link to="/privacy">Privacy Policy</Link>
+              <Link to="/contact">Contact</Link>
+            </nav>
+            <span>© 2026 Dental Clinic</span>
+          </div>
+        </footer>
       </div>
     </div>
   );

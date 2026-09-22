@@ -19,6 +19,7 @@ import { PatientDetailPage } from "../pages/shared/PatientDetailPage";
 import { AppointmentsAgendaPage } from "../pages/shared/AppointmentsAgendaPage";
 import { BillingPage } from "../pages/shared/BillingPage";
 import { SettingsPage } from "../pages/shared/SettingsPage";
+import { InformationPage } from "../pages/shared/InformationPage";
 
 import { MySchedulePage } from "../pages/dentist/MySchedulePage";
 
@@ -110,6 +111,30 @@ export function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["ADMIN", "RECEPTIONIST", "DENTIST", "PATIENT"]}>
             <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/terms"
+        element={
+          <ProtectedRoute allowedRoles={["ADMIN", "RECEPTIONIST", "DENTIST", "PATIENT"]}>
+            <InformationPage kind="terms" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/privacy"
+        element={
+          <ProtectedRoute allowedRoles={["ADMIN", "RECEPTIONIST", "DENTIST", "PATIENT"]}>
+            <InformationPage kind="privacy" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contact"
+        element={
+          <ProtectedRoute allowedRoles={["ADMIN", "RECEPTIONIST", "DENTIST", "PATIENT"]}>
+            <InformationPage kind="contact" />
           </ProtectedRoute>
         }
       />
