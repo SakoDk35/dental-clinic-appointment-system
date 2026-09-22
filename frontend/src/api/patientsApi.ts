@@ -6,7 +6,7 @@ export interface CreatePatientPayload {
   fullName: string;
   email: string;
   password: string;
-  phone?: string;
+  phone: string;
   dateOfBirth?: string;
 }
 

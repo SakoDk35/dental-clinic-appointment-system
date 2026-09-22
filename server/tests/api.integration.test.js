@@ -137,6 +137,65 @@ test("RBAC rejects Patient access to Admin dashboard", async () => {
   assert.equal(response.status, 403);
 });
 
+test("patient registration and staff-created patients validate phone format and digit count", async () => {
+  const registration = {
+    fullName: "Registered Patient",
+    email: "registered-patient@test.local",
+    password,
+  };
+
+  for (const phone of [undefined, "444", "abc12345678", "123@456789"]) {
+    const response = await api.post("/api/v1/auth/register").send({ ...registration, phone });
+    assert.equal(response.status, 400, response.text);
+    assert.equal(response.body.message, "Enter a valid phone number (8–15 digits).");
+  }
+
+  for (const [index, phone] of ["+374 94 123456", "094 123 456", "(094) 123-456"].entries()) {
+    const registered = await api.post("/api/v1/auth/register").send({
+      ...registration,
+      email: `registered-patient-${index}@test.local`,
+      phone,
+    });
+    assert.equal(registered.status, 201, registered.text);
+    assert.equal(registered.body.data.user.phone, phone);
+    assert.equal(registered.body.data.user.role, "PATIENT");
+  }
+  registration.email = "registered-patient-0@test.local";
+  const registeredLogin = await login(registration.email);
+  assert.ok(registeredLogin);
+
+  const staffPayload = {
+    fullName: "Staff Created Patient",
+    email: "staff-created-patient@test.local",
+    password,
+  };
+  for (const phone of [undefined, null, "", "   ", "444", "abc12345678", "123@456789", "1234567890123456", "1".repeat(31)]) {
+    const invalid = await api.post("/api/v1/patients").set(auth(tokens.receptionist)).send({ ...staffPayload, phone });
+    assert.equal(invalid.status, 400, invalid.text);
+    assert.equal(invalid.body.message, "Enter a valid phone number (8–15 digits).");
+  }
+  const adminInvalid = await api.post("/api/v1/patients").set(auth(tokens.admin)).send({ ...staffPayload, phone: "444" });
+  assert.equal(adminInvalid.status, 400, adminInvalid.text);
+
+  const created = await api.post("/api/v1/patients").set(auth(tokens.receptionist)).send({
+    ...staffPayload,
+    phone: "+37400987654",
+  });
+  assert.equal(created.status, 201, created.text);
+  assert.equal(created.body.data.phone, "+37400987654");
+});
+
+test("staff accounts can still be created without a phone number", async () => {
+  const response = await api.post("/api/v1/users").set(auth(tokens.admin)).send({
+    fullName: "Phone Optional Staff",
+    email: "phone-optional-staff@test.local",
+    password,
+    role: "RECEPTIONIST",
+  });
+  assert.equal(response.status, 201, response.text);
+  assert.equal(response.body.data.phone, null);
+});
+
 test("Admin cannot deactivate self or the last active Admin", async () => {
   const self = await api.patch(`/api/v1/users/${admin.id}/deactivate`).set(auth(tokens.admin));
   assert.equal(self.status, 409);

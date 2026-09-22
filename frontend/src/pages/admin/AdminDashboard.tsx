@@ -3,39 +3,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { StatCard } from "../../components/common/StatCard";
+import { DashboardStatIcon } from "../../components/common/DashboardStatIcon";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import { listAppointments } from "../../api/appointmentsApi";
 import { getAdminStats, type AdminStats } from "../../api/dashboardApi";
 import { useAuth } from "../../hooks/useAuth";
 import type { Appointment } from "../../types";
 import { getClinicToday } from "../../utils/clinicTime";
-
-type DashboardStatIconName = "calendar" | "revenue" | "unpaid" | "patients";
-
-function DashboardStatIcon({ name }: { name: DashboardStatIconName }) {
-  let paths;
-
-  switch (name) {
-    case "calendar":
-      paths = <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></>;
-      break;
-    case "revenue":
-      paths = <><ellipse cx="12" cy="6" rx="7" ry="3" /><path d="M5 6v6c0 1.66 3.13 3 7 3s7-1.34 7-3V6M5 12v6c0 1.66 3.13 3 7 3s7-1.34 7-3v-6" /></>;
-      break;
-    case "unpaid":
-      paths = <><circle cx="12" cy="12" r="9" /><path d="M12 7v6M12 17h.01" /></>;
-      break;
-    case "patients":
-      paths = <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></>;
-      break;
-  }
-
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {paths}
-    </svg>
-  );
-}
 
 export function AdminDashboard() {
   const { token, user } = useAuth();

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../../components/layout/AppShell";
 import { StatCard } from "../../components/common/StatCard";
+import { DashboardStatIcon } from "../../components/common/DashboardStatIcon";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import { listAppointments } from "../../api/appointmentsApi";
 import { useAuth } from "../../hooks/useAuth";
@@ -37,13 +38,13 @@ export function ReceptionistDashboard() {
           permissions table. */}
       <div className="row g-3 mb-3">
         <div className="col-6 col-md-4">
-          <StatCard label="Today's Appointments" value={isLoading ? "—" : String(todaysAppointments.length)} icon="C" />
+          <StatCard label="Today's Appointments" value={isLoading ? "—" : String(todaysAppointments.length)} icon={<DashboardStatIcon name="calendar" />} />
         </div>
         <div className="col-6 col-md-4">
           <StatCard
             label="Upcoming Appointments"
             value={isLoading ? "—" : String(upcomingAppointments.length)}
-            icon="U"
+            icon={<DashboardStatIcon name="calendarClock" />}
             accentColor="var(--color-secondary)"
           />
         </div>
@@ -51,7 +52,7 @@ export function ReceptionistDashboard() {
           <StatCard
             label="Booked (Unconfirmed)"
             value={isLoading ? "—" : String(appointments.filter((a) => a.status === "BOOKED").length)}
-            icon="!"
+            icon={<DashboardStatIcon name="appointmentPending" />}
             accentColor="var(--color-warning)"
           />
         </div>

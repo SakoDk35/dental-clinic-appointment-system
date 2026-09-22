@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "../../components/layout/AppShell";
 import { StatusBadge } from "../../components/common/StatusBadge";
 import { StatCard } from "../../components/common/StatCard";
+import { DashboardStatIcon } from "../../components/common/DashboardStatIcon";
 import { useAuth } from "../../hooks/useAuth";
 import { listPayments, markPaymentPaid, getBillingSummary, type BillingSummary } from "../../api/paymentsApi";
 import type { Payment } from "../../types";
@@ -65,16 +66,16 @@ export function BillingPage() {
       {summary && (
         <div className="row g-3 mb-4">
           <div className="col-6 col-md-3">
-            <StatCard label="Total Revenue" value={`${summary.totalRevenue.toLocaleString()} AMD`} icon="R" />
+            <StatCard label="Total Revenue" value={`${summary.totalRevenue.toLocaleString()} AMD`} icon={<DashboardStatIcon name="revenue" />} />
           </div>
           <div className="col-6 col-md-3">
-            <StatCard label="Unpaid Total" value={`${summary.unpaidTotal.toLocaleString()} AMD`} icon="U" />
+            <StatCard label="Unpaid Total" value={`${summary.unpaidTotal.toLocaleString()} AMD`} icon={<DashboardStatIcon name="wallet" />} />
           </div>
           <div className="col-6 col-md-3">
-            <StatCard label="Paid" value={String(summary.paidCount)} icon="✓" />
+            <StatCard label="Paid" value={String(summary.paidCount)} icon={<DashboardStatIcon name="paid" />} />
           </div>
           <div className="col-6 col-md-3">
-            <StatCard label="Unpaid" value={String(summary.unpaidCount)} icon="!" />
+            <StatCard label="Unpaid" value={String(summary.unpaidCount)} icon={<DashboardStatIcon name="unpaid" />} />
           </div>
         </div>
       )}

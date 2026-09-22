@@ -5,6 +5,7 @@ import { register } from "../../api/authApi";
 import { FormField } from "../../components/common/FormField";
 import { PasswordField } from "../../components/common/PasswordField";
 import { VALIDATION_LIMITS } from "../../utils/validationLimits";
+import { isValidPatientPhone, PATIENT_PHONE_ERROR } from "../../utils/patientPhone";
 import "./LoginPage.css";
 
 interface FieldErrors {
@@ -36,6 +37,7 @@ export function RegisterPage() {
     if (!password || password.length < 8) {
       errors.password = "Password must be at least 8 characters.";
     }
+    if (!isValidPatientPhone(phone.trim())) errors.phone = PATIENT_PHONE_ERROR;
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   }
@@ -47,7 +49,7 @@ export function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      await register({ fullName, email, password, phone: phone || undefined });
+      await register({ fullName, email, password, phone: phone.trim() });
       // No auto-login on purpose (keeps the flow simple, matches the
       // approved plan) — send them to log in with the credentials they
       // just created.
@@ -136,12 +138,14 @@ export function RegisterPage() {
               />
               <FormField
                 id="phone"
-                label="Phone (optional)"
+                label="Phone Number *"
                 type="tel"
                 autoComplete="tel"
+                required
                 value={phone}
                 maxLength={VALIDATION_LIMITS.phone}
                 onChange={(e) => setPhone(e.target.value)}
+                error={fieldErrors.phone}
               />
               <PasswordField
                 id="password"

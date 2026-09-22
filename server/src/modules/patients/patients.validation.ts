@@ -7,6 +7,15 @@ import { AppError } from "../../middleware/errorHandler";
 import { VALIDATION_LIMITS } from "../../utils/validationLimits";
 
 const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+const PATIENT_PHONE_ERROR = "Enter a valid phone number (8–15 digits).";
+
+function isValidPatientPhone(phone: string): boolean {
+  const digitCount = phone.replace(/[^0-9]/g, "").length;
+  return phone.length <= VALIDATION_LIMITS.phone
+    && /^[0-9+ ()-]+$/.test(phone)
+    && digitCount >= 8
+    && digitCount <= 15;
+}
 
 interface PatientInput {
   fullName?: unknown;
@@ -16,10 +25,9 @@ interface PatientInput {
   dateOfBirth?: unknown;
 }
 
-// Used for both self-registration and staff-created patients. `password`
-// is required for registration but not for staff edits, so callers pass
-// requirePassword accordingly.
-export function validatePatientInput(input: PatientInput, requirePassword: boolean) {
+// Patient creation requires a phone; Admin/Receptionist account creation
+// reuses these field checks with requirePhone=false.
+export function validatePatientInput(input: PatientInput, requirePassword: boolean, requirePhone = true) {
   const { fullName, email, password, phone, dateOfBirth } = input;
 
   if (!fullName || typeof fullName !== "string" || !fullName.trim()) {
@@ -45,10 +53,13 @@ export function validatePatientInput(input: PatientInput, requirePassword: boole
     }
   }
 
-  if (phone !== undefined && phone !== null && typeof phone !== "string") {
+  if (requirePhone && (typeof phone !== "string" || !isValidPatientPhone(phone.trim()))) {
+    throw new AppError(400, PATIENT_PHONE_ERROR);
+  }
+  if (!requirePhone && phone !== undefined && phone !== null && typeof phone !== "string") {
     throw new AppError(400, "Phone must be text.");
   }
-  if (typeof phone === "string" && phone.length > VALIDATION_LIMITS.phone) {
+  if (!requirePhone && typeof phone === "string" && phone.length > VALIDATION_LIMITS.phone) {
     throw new AppError(400, `Phone must be ${VALIDATION_LIMITS.phone} characters or fewer.`);
   }
 

@@ -50,7 +50,7 @@ interface CreatePatientInput {
   fullName: string;
   email: string;
   password: string;
-  phone?: string;
+  phone: string;
   dateOfBirth?: string;
 }
 
@@ -69,7 +69,7 @@ export async function createPatient(input: CreatePatientInput) {
       fullName: input.fullName.trim(),
       email,
       passwordHash,
-      phone: input.phone ?? null,
+      phone: input.phone.trim(),
       dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
       role: "PATIENT",
     },

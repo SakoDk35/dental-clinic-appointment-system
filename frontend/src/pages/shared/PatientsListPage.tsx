@@ -8,6 +8,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { listPatients, createPatient } from "../../api/patientsApi";
 import type { User } from "../../types";
 import { VALIDATION_LIMITS } from "../../utils/validationLimits";
+import { isValidPatientPhone, PATIENT_PHONE_ERROR } from "../../utils/patientPhone";
 
 export function PatientsListPage() {
   const { token } = useAuth();
@@ -145,10 +146,14 @@ function CreatePatientModal({
       setError("Full name, a valid email, and a password of at least 8 characters are required.");
       return;
     }
+    if (!isValidPatientPhone(phone.trim())) {
+      setError(PATIENT_PHONE_ERROR);
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const created = await createPatient(token, { fullName, email, password, phone: phone || undefined });
+      const created = await createPatient(token, { fullName, email, password, phone: phone.trim() });
       onCreated(created);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create patient.");
@@ -181,7 +186,7 @@ function CreatePatientModal({
               )}
               <FormField id="newPatientName" label="Full Name" value={fullName} maxLength={VALIDATION_LIMITS.fullName} onChange={(e) => setFullName(e.target.value)} />
               <FormField id="newPatientEmail" label="Email" type="email" value={email} maxLength={VALIDATION_LIMITS.email} onChange={(e) => setEmail(e.target.value)} />
-              <FormField id="newPatientPhone" label="Phone (optional)" type="tel" value={phone} maxLength={VALIDATION_LIMITS.phone} onChange={(e) => setPhone(e.target.value)} />
+              <FormField id="newPatientPhone" label="Phone Number *" type="tel" value={phone} maxLength={VALIDATION_LIMITS.phone} required onChange={(e) => setPhone(e.target.value)} />
               <PasswordField
                 id="newPatientPassword"
                 label="Temporary Password"

@@ -103,7 +103,7 @@ export async function getOne(req: Request, res: Response, next: NextFunction) {
 export async function createStaff(req: Request, res: Response, next: NextFunction) {
   try {
     const { fullName, email, password, phone, role } = req.body ?? {};
-    validatePatientInput({ fullName, email, password, phone }, true);
+    validatePatientInput({ fullName, email, password, phone }, true, false);
 
     if (role !== "ADMIN" && role !== "RECEPTIONIST") {
       throw new AppError(400, "Role must be ADMIN or RECEPTIONIST.");
