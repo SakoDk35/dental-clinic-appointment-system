@@ -1,10 +1,47 @@
 # Dental Clinic Appointment Booking System
 
-A small, full-stack MVP for a single dental clinic: patients book appointments
-online, staff manage the schedule and billing, dentists record simple
-treatment notes. Built deliberately simple — no microservices, no message
-queues, no over-engineering — so the whole thing stays easy to read and
-explain.
+A full-stack dental clinic application for patient booking and day-to-day clinic
+workflows. Patients manage appointments, while staff coordinate schedules,
+treatment records, and billing through role-based interfaces.
+
+## Live Demo
+
+- **Frontend:** [https://dental-clinic-frontend-2hwo.onrender.com](https://dental-clinic-frontend-2hwo.onrender.com)
+- **Backend health:** [https://dental-clinic-api-x1b2.onrender.com/health](https://dental-clinic-api-x1b2.onrender.com/health)
+
+The frontend runs on a Render Static Site, the backend on a Render Web Service,
+and PostgreSQL is hosted on Neon. The Render free backend may take approximately
+50 seconds to wake after inactivity.
+
+## Features
+
+- Role-based dashboards for Admin, Receptionist, Dentist, and Patient
+- Patient registration with validated phone numbers
+- Appointment booking, cancellation, and patient self-rescheduling
+- Dentist weekly availability and time-off exceptions
+- Double-booking protection, including overlapping 30/60-minute appointments
+- Appointment lifecycle from booking through confirmation and completion
+- Dentist treatment notes visible to the author and Admin
+- Billing with `UNPAID`, `PAID`, and `VOID` statuses
+- In-app notifications
+- Patient search and appointment search/filtering
+- Responsive UI across desktop, tablet, and mobile
+- Terms of Service, Privacy Policy, and Contact pages
+
+## Demo Accounts
+
+| Role | Email |
+|---|---|
+| Admin | admin@clinic.com |
+| Receptionist | reception@clinic.com |
+| Dentist | dentist@clinic.com |
+| Dentist 2 | dentist2@clinic.com |
+| Patient | patient@clinic.com |
+
+**Password for all accounts:** `Password123`
+
+These are public demo accounts intended only for evaluating the application.
+Do not enter real personal, medical, or payment information.
 
 ## Stack
 
@@ -29,8 +66,8 @@ dental-clinic-project/
 cd server
 npm install
 cp .env.example .env
-# edit .env: set DATABASE_URL, a JWT_SECRET of at least 32 characters,
-# and FRONTEND_URL=http://localhost:5173
+# edit .env: set DATABASE_URL and DIRECT_URL (both may use the same local database),
+# a JWT_SECRET of at least 32 characters, and FRONTEND_URL=http://localhost:5173
 
 npx prisma migrate dev
 npm run prisma:seed
@@ -55,29 +92,16 @@ npm run dev
 
 Open the URL Vite prints (usually `http://localhost:5173`).
 
-## Demo Accounts
-
-All demo accounts created by `npm run prisma:seed` share the password
-`Password123`:
-
-| Role | Email |
-|---|---|
-| Admin | admin@clinic.com |
-| Receptionist | reception@clinic.com |
-| Dentist | dentist@clinic.com |
-| Dentist (2nd) | dentist2@clinic.com |
-| Patient | patient@clinic.com |
-
 New patients can also self-register from the Login page. The seed creates the
-accounts, dentist profiles, weekly working hours, and services listed above; it
-does not create sample appointments or payments.
+demo accounts, dentist profiles, weekly working hours, and services; it does
+not create sample appointments or payments.
 
 ## Roles & Permissions
 
 - **Admin** — full access: dentists, services, staff accounts, billing/revenue, all patients and appointments.
 - **Receptionist** — manages patients and appointments, marks payments as paid; no revenue figures, no treatment notes.
 - **Dentist** — sees only their own schedule, marks appointments completed, writes optional treatment notes (visible only to that dentist and Admin).
-- **Patient** — books/cancels their own appointments, views their own profile and appointment history.
+- **Patient** — books, cancels, and reschedules their own appointments; views their own profile and appointment history.
 
 ## Core Business Rules Enforced by the Backend
 
@@ -90,6 +114,7 @@ does not create sample appointments or payments.
   block re-booking cancelled slots.
 - Appointments cannot be booked or rescheduled into the past.
 - Appointment times must fall within the dentist's weekly working hours.
+- Dentist time-off blocks affected booking and rescheduling slots.
 - Future appointments cannot be marked completed.
 - Treatment notes are visible only to the writing dentist and Admin — never Receptionist or Patient.
 - Treatment notes can only be written or edited after the appointment is completed.
@@ -104,14 +129,26 @@ Backend (`server/.env`):
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/dental_clinic?schema=public"
+DIRECT_URL="postgresql://USER:PASSWORD@localhost:5432/dental_clinic?schema=public"
 PORT=4000
 JWT_SECRET="replace-with-a-random-secret-of-at-least-32-characters"
 FRONTEND_URL="http://localhost:5173"
 ```
 
+Prisma uses `DATABASE_URL` at runtime and `DIRECT_URL` for migrations. In
+production, these are the Neon pooled and direct connection URLs, respectively.
 `FRONTEND_URL` accepts a comma-separated list when more than one browser origin
 is needed. The frontend uses `VITE_API_URL`, as shown in `frontend/.env.example`.
 Never commit real credentials or secrets.
+
+## Deployment
+
+- **Frontend:** Render Static Site, configured with the backend's public API URL.
+- **Backend:** Render Web Service, configured with the frontend origin and JWT secret.
+- **Database:** Neon PostgreSQL; the API uses the pooled connection and Prisma migrations use the direct connection.
+- **Backend build:** `npm ci --include=dev && npx prisma generate && npx prisma migrate deploy && npm run build`.
+- **Migrations:** Prisma migrations run automatically during the Render backend build; no separate Pre-Deploy Command is used.
+- **Secrets:** Configure environment variables in the hosting services; keep `.env` files and credentials out of Git.
 
 ## Security Basics
 
@@ -147,14 +184,10 @@ reporting, no AI features, no microservices, no Docker.
 
 ## Note on Migrations
 
-If you already ran an earlier migration that included the
-`@@unique([dentistId, appointmentDate, startTime])` constraint on
-`Appointment`, run `npx prisma migrate dev` again after pulling this version —
-that constraint has been replaced with a plain index (see "Core Business Rules"
-above for why).
-
-The later migrations add the PostgreSQL exclusion constraint and the `VOID`
-payment status. Run migrations forward; do not reset an existing database:
+The migration history includes the PostgreSQL overlap exclusion constraint,
+`VOID` payment status, and dentist time-off. The Render backend build applies
+migrations automatically. For local or other environments, apply migrations
+forward; do not reset an existing database:
 
 ```bash
 cd server
@@ -163,10 +196,10 @@ npx prisma migrate deploy
 
 ## Automated API Tests
 
-The focused integration suite covers authentication/RBAC, overlap and concurrent
-booking protection, working hours, cancelled-slot rebooking, lifecycle rules,
-treatment-note privacy, billing, strict payment dates, timezone behavior, and API
-404 responses.
+The integration suite covers authentication/RBAC, patient phone validation,
+overlap and concurrent booking protection, working hours and time-off,
+rescheduling, cancelled-slot rebooking, lifecycle rules, treatment-note privacy,
+billing, strict payment dates, timezone behavior, and API 404 responses.
 
 Tests deliberately require a separate PostgreSQL database whose name contains
 `test`. They never fall back to the development `DATABASE_URL`:
@@ -182,12 +215,6 @@ The suite clears only its isolated test database before and after execution.
 
 ## Known Limitations
 
-- The Appointments screen uses a single agenda/list layout at every screen
-  size (rather than a separate desktop grid + mobile list) — this was a
-  deliberate simplification: it satisfies the approved "simplified list view
-  on mobile" requirement, works identically well on desktop, and avoids
-  building and maintaining two different calendar implementations.
-- The Admin dashboard's original "weekly revenue chart" mockup used
-  placeholder numbers with no real backing data or endpoint; it was removed
-  rather than shipped with fake numbers. The real revenue/unpaid/appointment
-  stat cards are backed by a real `/dashboard/admin` endpoint.
+- Appointments use a responsive agenda/list rather than a calendar grid.
+- The Admin dashboard shows real revenue, unpaid balance, and appointment
+  figures from `/dashboard/admin`; it does not include a revenue chart.
